@@ -7,7 +7,7 @@ part 'active_session_dao.g.dart';
 @DriftAccessor(tables: [ActiveSessions])
 class ActiveSessionDao extends DatabaseAccessor<AppDatabase>
     with _$ActiveSessionDaoMixin {
-  ActiveSessionDao(AppDatabase db) : super(db);
+  ActiveSessionDao(super.db);
 
   // ========== Get Active Session ==========
   /// Get the current active session (only one row, id=1)

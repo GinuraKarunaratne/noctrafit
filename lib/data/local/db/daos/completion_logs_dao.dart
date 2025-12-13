@@ -7,7 +7,7 @@ part 'completion_logs_dao.g.dart';
 @DriftAccessor(tables: [CompletionLogs])
 class CompletionLogsDao extends DatabaseAccessor<AppDatabase>
     with _$CompletionLogsDaoMixin {
-  CompletionLogsDao(AppDatabase db) : super(db);
+  CompletionLogsDao(super.db);
 
   // Create
   Future<int> insertLog(CompletionLogsCompanion log) {

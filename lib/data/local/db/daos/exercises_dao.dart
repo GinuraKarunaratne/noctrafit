@@ -7,7 +7,7 @@ part 'exercises_dao.g.dart';
 @DriftAccessor(tables: [Exercises])
 class ExercisesDao extends DatabaseAccessor<AppDatabase>
     with _$ExercisesDaoMixin {
-  ExercisesDao(AppDatabase db) : super(db);
+  ExercisesDao(super.db);
 
   // Create
   Future<int> insertExercise(ExercisesCompanion exercise) {

@@ -1,12 +1,21 @@
 import 'package:drift/drift.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../local/db/app_database.dart';
 import '../local/db/daos/schedule_dao.dart';
+import '../remote/firestore/user_remote_datasource.dart';
 
 /// Repository for schedule entries
 class ScheduleRepository {
   final ScheduleDao _dao;
+  final UserRemoteDataSource? _userRemote;
+  final FirebaseAuth? _auth;
 
-  ScheduleRepository(this._dao);
+  ScheduleRepository(
+    this._dao, {
+    UserRemoteDataSource? userRemote,
+    FirebaseAuth? auth,
+  })  : _userRemote = userRemote,
+        _auth = auth;
 
   // Read
   Future<List<ScheduleEntry>> getAllEntries() => _dao.getAllEntries();
@@ -32,10 +41,12 @@ class ScheduleRepository {
     required DateTime scheduledDate,
     required String timeOfDay,
     String? note,
-  }) {
+  }) async {
     final now = DateTime.now();
-    return _dao.insertEntry(ScheduleEntriesCompanion(
-      uuid: Value(DateTime.now().millisecondsSinceEpoch.toString()),
+    final entryUuid = DateTime.now().millisecondsSinceEpoch.toString();
+
+    final id = await _dao.insertEntry(ScheduleEntriesCompanion(
+      uuid: Value(entryUuid),
       workoutSetId: Value(workoutSetId),
       scheduledDate: Value(scheduledDate),
       timeOfDay: Value(timeOfDay),
@@ -44,6 +55,30 @@ class ScheduleRepository {
       createdAt: Value(now),
       updatedAt: Value(now),
     ));
+
+    // Sync to Firestore if user is logged in
+    final user = _auth?.currentUser;
+    if (user != null && _userRemote != null) {
+      try {
+        await _userRemote.syncScheduleEntry(
+          userId: user.uid,
+          entryUuid: entryUuid,
+          data: {
+            'workout_set_id': workoutSetId,
+            'scheduled_date': scheduledDate.toIso8601String(),
+            'time_of_day': timeOfDay,
+            'note': note,
+            'is_completed': false,
+            'created_at': now.toIso8601String(),
+            'updated_at': now.toIso8601String(),
+          },
+        );
+      } catch (e) {
+        // Log error but don't fail the schedule creation
+      }
+    }
+
+    return id;
   }
 
   // Update
@@ -51,7 +86,25 @@ class ScheduleRepository {
   Future<void> markAsCompleted(int id) => _dao.markAsCompleted(id);
 
   // Delete
-  Future<int> deleteEntry(int id) => _dao.deleteEntry(id);
+  Future<int> deleteEntry(int id) async {
+    // Get the entry to retrieve its UUID before deleting
+    final allEntries = await _dao.getAllEntries();
+    final entry = allEntries.firstWhere((e) => e.id == id, orElse: () => throw Exception('Entry not found'));
+
+    final result = await _dao.deleteEntry(id);
+
+    // Sync deletion to Firestore if user is logged in
+    final user = _auth?.currentUser;
+    if (user != null && _userRemote != null) {
+      try {
+        await _userRemote.deleteScheduleEntry(user.uid, entry.uuid);
+      } catch (e) {
+        // Log error but don't fail the deletion
+      }
+    }
+
+    return result;
+  }
   Future<void> deleteEntriesBeforeDate(DateTime date) =>
       _dao.deleteEntriesBeforeDate(date);
 

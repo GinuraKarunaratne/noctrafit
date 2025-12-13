@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
+import '../../../data/local/db/app_database.dart';
 
 /// UF3: Active Session Progress Screen
 ///
@@ -36,38 +39,9 @@ class _ActiveSessionProgressScreenState
     extends ConsumerState<ActiveSessionProgressScreen> {
   Timer? _timer;
   Duration _elapsed = Duration.zero;
-  int _currentExerciseIndex = 0;
-  final List<String> _completedExercises = [];
-
-  // Mock data - will be replaced with actual session data from provider
-  final String _workoutName = 'Night Shift Quick Starter';
-  final List<Map<String, dynamic>> _exercises = [
-    {
-      'name': 'Push-ups',
-      'sets': 3,
-      'reps': 12,
-      'rest': '30s',
-    },
-    {
-      'name': 'Squats',
-      'sets': 3,
-      'reps': 15,
-      'rest': '30s',
-    },
-    {
-      'name': 'Plank',
-      'sets': 3,
-      'duration': '45s',
-      'rest': '30s',
-    },
-    {
-      'name': 'Lunges',
-      'sets': 3,
-      'reps': 12,
-      'rest': '30s',
-    },
-  ];
-  final int _estimatedMinutes = 15;
+  ActiveSession? _session;
+  WorkoutSet? _workoutSet;
+  List<Map<String, dynamic>> _exercises = [];
 
   bool _hasSpoken50Percent = false;
   bool _hasSpoken10MinRemaining = false;
@@ -75,21 +49,31 @@ class _ActiveSessionProgressScreenState
   @override
   void initState() {
     super.initState();
-
-    // TODO: Load session from active_session table
-    // final session = ref.read(activeSessionProvider);
-    // _elapsed = Duration(seconds: DateTime.now().difference(session.startedAt).inSeconds);
-    // _currentExerciseIndex = session.currentExerciseIndex;
-    // _completedExercises.addAll(session.completedExercises);
-
-    // Start timer
+    _loadSession();
     _startTimer();
+  }
 
-    // TODO: Speak screen entry
-    // ref.read(ttsServiceProvider).speakScreenSummary(
-    //   'Active Workout',
-    //   details: 'Starting $_workoutName. $_estimatedMinutes minutes estimated.',
-    // );
+  Future<void> _loadSession() async {
+    final session = await ref.read(sessionRepositoryProvider).getActiveSession();
+    if (session != null && mounted) {
+      // Get all sets and find by ID
+      final allSets = await ref.read(setsRepositoryProvider).getAllSets();
+      final workoutSet = allSets.firstWhere((set) => set.id == session.workoutSetId);
+
+      setState(() {
+        _session = session;
+        _workoutSet = workoutSet;
+        _elapsed = DateTime.now().difference(session.startedAt);
+
+        // Parse exercises JSON
+        try {
+          final exercisesJson = jsonDecode(workoutSet.exercises) as List<dynamic>;
+          _exercises = exercisesJson.cast<Map<String, dynamic>>();
+        } catch (e) {
+          _exercises = [];
+        }
+      });
+    }
   }
 
   @override
@@ -115,82 +99,66 @@ class _ActiveSessionProgressScreenState
   }
 
   void _checkMilestones() {
+    if (_session == null) return;
+
     final progress = _getProgressPercentage();
-    final remainingMinutes =
-        _estimatedMinutes - (_elapsed.inMinutes);
+    final remainingMinutes = _session!.estimatedMinutes - (_elapsed.inMinutes);
 
     // 50% milestone
     if (progress >= 0.5 && !_hasSpoken50Percent) {
       _hasSpoken50Percent = true;
-      // TODO: TTS announcement
-      // ref.read(ttsServiceProvider).speakMilestone('You are halfway through the workout!');
     }
 
     // 10 minutes remaining
     if (remainingMinutes <= 10 && remainingMinutes > 9 && !_hasSpoken10MinRemaining) {
       _hasSpoken10MinRemaining = true;
-      // TODO: TTS announcement
-      // ref.read(ttsServiceProvider).speakMilestone('10 minutes remaining');
     }
   }
 
   double _getProgressPercentage() {
-    return (_currentExerciseIndex + 1) / _exercises.length;
+    if (_exercises.isEmpty || _session == null) return 0;
+    return (_session!.currentExerciseIndex + 1) / _exercises.length;
   }
 
-  void _previousExercise() {
-    if (_currentExerciseIndex > 0) {
-      setState(() {
-        _currentExerciseIndex--;
-      });
+  void _previousExercise() async {
+    if (_session == null || _session!.currentExerciseIndex <= 0) return;
 
-      // TODO: Persist to active_session table
-      // ref.read(sessionRepositoryProvider).updateCurrentExercise(widget.sessionUuid, _currentExerciseIndex);
-    }
+    await ref.read(sessionRepositoryProvider).goToPreviousExercise();
+    await _loadSession();
   }
 
-  void _nextExercise() {
-    if (_currentExerciseIndex < _exercises.length - 1) {
-      // Mark current as completed if not already
-      final currentExerciseId = _exercises[_currentExerciseIndex]['name'];
-      if (!_completedExercises.contains(currentExerciseId)) {
-        _completedExercises.add(currentExerciseId);
-      }
+  void _nextExercise() async {
+    if (_session == null || _session!.currentExerciseIndex >= _exercises.length - 1) return;
 
-      setState(() {
-        _currentExerciseIndex++;
-      });
-
-      // TODO: Persist to active_session table
-      // ref.read(sessionRepositoryProvider).updateCurrentExercise(
-      //   widget.sessionUuid,
-      //   _currentExerciseIndex,
-      //   _completedExercises,
-      // );
-    }
+    await ref.read(sessionRepositoryProvider).progressToNextExercise();
+    await _loadSession();
   }
 
   Future<void> _completeWorkout() async {
+    if (_session == null || _workoutSet == null) return;
+
     _timer?.cancel();
 
-    // TODO: Save to completion_logs table
-    // await ref.read(sessionRepositoryProvider).completeWorkout(
-    //   widget.sessionUuid,
-    //   _elapsed,
-    //   _completedExercises,
-    // );
-
-    // TODO: TTS announcement
-    // await ref.read(ttsServiceProvider).speakWorkoutCompleted();
+    // Complete session and save to completion logs
+    await ref.read(sessionRepositoryProvider).completeSession();
 
     if (mounted) {
+      // Parse completed exercises count
+      int completedCount = 0;
+      try {
+        final completed = jsonDecode(_session!.completedExercises) as List<dynamic>;
+        completedCount = completed.length;
+      } catch (e) {
+        completedCount = _session!.currentExerciseIndex;
+      }
+
       // Show completion dialog
       await showDialog(
         context: context,
         builder: (context) => _CompletionDialog(
-          workoutName: _workoutName,
+          workoutName: _workoutSet!.name,
           duration: _elapsed,
-          exercisesCompleted: _completedExercises.length,
+          exercisesCompleted: completedCount,
           totalExercises: _exercises.length,
         ),
       );
@@ -205,14 +173,29 @@ class _ActiveSessionProgressScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final currentExercise = _exercises[_currentExerciseIndex];
+
+    // Show loading state if session not loaded yet
+    if (_session == null || _workoutSet == null || _exercises.isEmpty) {
+      return Scaffold(
+        backgroundColor: ColorTokens.background,
+        appBar: AppBar(
+          title: const Text('Loading...'),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final currentExerciseIndex = _session!.currentExerciseIndex;
+    final currentExercise = _exercises[currentExerciseIndex];
     final progress = _getProgressPercentage();
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
       appBar: AppBar(
         title: Text(
-          _workoutName,
+          _workoutSet!.name,
           style: const TextStyle(
             color: ColorTokens.textPrimary,
             fontWeight: FontWeight.bold,
@@ -222,33 +205,38 @@ class _ActiveSessionProgressScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(TablerIcons.x, color: ColorTokens.textSecondary),
-          onPressed: () {
+          onPressed: () async {
             // Show confirmation dialog
-            showDialog(
+            final confirmed = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
-                title: const Text('End Workout?'),
+                backgroundColor: ColorTokens.surface,
+                title: const Text('End Workout?', style: TextStyle(color: ColorTokens.textPrimary)),
                 content: const Text(
-                    'Are you sure you want to end this workout? Progress will be lost.'),
+                  'Are you sure you want to end this workout? Progress will be saved.',
+                  style: TextStyle(color: ColorTokens.textSecondary),
+                ),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context, false),
                     child: const Text('Cancel'),
                   ),
                   TextButton(
-                    onPressed: () {
-                      _timer?.cancel();
-                      // TODO: Clear active session
-                      // ref.read(sessionRepositoryProvider).clearSession();
-                      Navigator.pop(context); // Close dialog
-                      Navigator.pop(context); // Close screen
-                    },
+                    onPressed: () => Navigator.pop(context, true),
                     child: const Text('End',
                         style: TextStyle(color: ColorTokens.error)),
                   ),
                 ],
               ),
             );
+
+            if (confirmed == true && mounted) {
+              _timer?.cancel();
+              await ref.read(sessionRepositoryProvider).completeSession();
+              if (mounted) {
+                Navigator.of(context).pop();
+              }
+            }
           },
         ),
       ),
@@ -311,7 +299,7 @@ class _ActiveSessionProgressScreenState
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Exercise ${_currentExerciseIndex + 1}/${_exercises.length}',
+                        'Exercise ${currentExerciseIndex + 1}/${_exercises.length}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: ColorTokens.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -387,11 +375,11 @@ class _ActiveSessionProgressScreenState
                   Expanded(
                     child: OutlinedButton(
                       onPressed:
-                          _currentExerciseIndex > 0 ? _previousExercise : null,
+                          currentExerciseIndex > 0 ? _previousExercise : null,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(
-                          color: _currentExerciseIndex > 0
+                          color: currentExerciseIndex > 0
                               ? ColorTokens.border
                               : ColorTokens.border.withOpacity(0.3),
                         ),
@@ -404,7 +392,7 @@ class _ActiveSessionProgressScreenState
                         children: [
                           Icon(
                             TablerIcons.chevron_left,
-                            color: _currentExerciseIndex > 0
+                            color: currentExerciseIndex > 0
                                 ? ColorTokens.textPrimary
                                 : ColorTokens.textSecondary,
                           ),
@@ -412,7 +400,7 @@ class _ActiveSessionProgressScreenState
                           Text(
                             'Previous',
                             style: TextStyle(
-                              color: _currentExerciseIndex > 0
+                              color: currentExerciseIndex > 0
                                   ? ColorTokens.textPrimary
                                   : ColorTokens.textSecondary,
                             ),
@@ -427,13 +415,13 @@ class _ActiveSessionProgressScreenState
                   // Next button
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _currentExerciseIndex < _exercises.length - 1
+                      onPressed: currentExerciseIndex < _exercises.length - 1
                           ? _nextExercise
                           : null,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor:
-                            _currentExerciseIndex < _exercises.length - 1
+                            currentExerciseIndex < _exercises.length - 1
                                 ? ColorTokens.accent
                                 : ColorTokens.surface,
                         shape: RoundedRectangleBorder(
@@ -447,7 +435,7 @@ class _ActiveSessionProgressScreenState
                             'Next',
                             style: TextStyle(
                               color:
-                                  _currentExerciseIndex < _exercises.length - 1
+                                  currentExerciseIndex < _exercises.length - 1
                                       ? ColorTokens.background
                                       : ColorTokens.textSecondary,
                               fontWeight: FontWeight.bold,
@@ -457,7 +445,7 @@ class _ActiveSessionProgressScreenState
                           Icon(
                             TablerIcons.chevron_right,
                             color:
-                                _currentExerciseIndex < _exercises.length - 1
+                                currentExerciseIndex < _exercises.length - 1
                                     ? ColorTokens.background
                                     : ColorTokens.textSecondary,
                           ),

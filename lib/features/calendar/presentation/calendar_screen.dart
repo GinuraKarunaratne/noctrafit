@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
+import '../../../data/local/db/app_database.dart';
 
 /// Calendar screen - Schedule and view upcoming workouts
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -14,11 +16,44 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   DateTime _selectedDate = DateTime.now();
+  List<ScheduleEntry> _scheduleEntries = [];
+  Map<int, WorkoutSet> _workoutSetsCache = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScheduleEntries();
+  }
+
+  Future<void> _loadScheduleEntries() async {
+    setState(() => _isLoading = true);
+
+    final scheduleRepo = ref.read(scheduleRepositoryProvider);
+    final setsRepo = ref.read(setsRepositoryProvider);
+
+    // Load schedule entries for selected date
+    final entries = await scheduleRepo.getEntriesForDate(_selectedDate);
+
+    // Load workout sets for all entries
+    final allSets = await setsRepo.getAllSets();
+    final setsCache = <int, WorkoutSet>{};
+    for (final set in allSets) {
+      setsCache[set.id] = set;
+    }
+
+    if (mounted) {
+      setState(() {
+        _scheduleEntries = entries;
+        _workoutSetsCache = setsCache;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheduledWorkouts = _getMockScheduledWorkouts();
 
     return Scaffold(
       appBar: AppBar(
@@ -41,7 +76,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             color: ColorTokens.surface,
             child: _WeekView(
               selectedDate: _selectedDate,
-              onDateSelected: (date) => setState(() => _selectedDate = date),
+              onDateSelected: (date) {
+                setState(() => _selectedDate = date);
+                _loadScheduleEntries();
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -68,42 +106,39 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: scheduledWorkouts.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(TablerIcons.calendar_off, size: 64, color: ColorTokens.textSecondary.withOpacity(0.5)),
-                        const SizedBox(height: 16),
-                        Text('No workouts scheduled', style: TextStyle(color: ColorTokens.textSecondary, fontSize: 16)),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: scheduledWorkouts.length,
-                    itemBuilder: (context, index) {
-                      final workout = scheduledWorkouts[index];
-                      return _ScheduledWorkoutCard(
-                        name: workout['name']!,
-                        time: workout['time']!,
-                        duration: workout['duration']!,
-                        isCompleted: workout['completed'] == 'true',
-                        onTap: () {},
-                      );
-                    },
-                  ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _scheduleEntries.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(TablerIcons.calendar_off, size: 64, color: ColorTokens.textSecondary.withOpacity(0.5)),
+                            const SizedBox(height: 16),
+                            const Text('No workouts scheduled', style: TextStyle(color: ColorTokens.textSecondary, fontSize: 16)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _scheduleEntries.length,
+                        itemBuilder: (context, index) {
+                          final entry = _scheduleEntries[index];
+                          final workoutSet = _workoutSetsCache[entry.workoutSetId];
+
+                          return _ScheduledWorkoutCard(
+                            name: workoutSet?.name ?? 'Unknown Workout',
+                            time: entry.timeOfDay,
+                            duration: workoutSet != null ? '${workoutSet.estimatedMinutes} min' : '-',
+                            isCompleted: entry.isCompleted,
+                            onTap: () {},
+                          );
+                        },
+                      ),
           ),
         ],
       ),
     );
-  }
-
-  List<Map<String, String>> _getMockScheduledWorkouts() {
-    return [
-      {'name': 'Night Shift Quick Starter', 'time': '10:00 PM', 'duration': '15 min', 'completed': 'false'},
-      {'name': 'Late Night Wind Down', 'time': '11:30 PM', 'duration': '12 min', 'completed': 'false'},
-    ];
   }
 
   String _formatDate(DateTime date) {

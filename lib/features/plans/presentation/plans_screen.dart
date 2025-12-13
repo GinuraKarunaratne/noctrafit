@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/theme/color_tokens.dart';
+import '../../../data/local/db/app_database.dart';
+import '../providers/plans_providers.dart';
 
 /// Plans screen - Browse and filter workout sets
 /// Features: 3 tabs (App/Community/All), search, filter, sort
@@ -18,15 +21,15 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
-  // Filters
-  String? _selectedCategory;
-  String? _selectedDifficulty;
-  String _sortBy = 'recent'; // recent, popular, difficulty, duration
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // Sync search controller with provider
+    _searchController.addListener(() {
+      ref.read(searchQueryProvider.notifier).state = _searchController.text;
+    });
   }
 
   @override
@@ -38,6 +41,10 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
 
   @override
   Widget build(BuildContext context) {
+    final selectedCategory = ref.watch(selectedCategoryProvider);
+    final selectedDifficulty = ref.watch(selectedDifficultyProvider);
+    final hasActiveFilters = selectedCategory != null || selectedDifficulty != null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Workout Plans'),
@@ -67,7 +74,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
                     IconButton(
                       icon: Icon(
                         TablerIcons.filter,
-                        color: _hasActiveFilters()
+                        color: hasActiveFilters
                             ? ColorTokens.accent
                             : ColorTokens.textSecondary,
                       ),
@@ -91,28 +98,29 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
                   borderSide: BorderSide(color: ColorTokens.border),
                 ),
               ),
-              onChanged: (value) {
-                setState(() {}); // Trigger rebuild to filter
-              },
             ),
           ),
 
           // Active filters chips
-          if (_hasActiveFilters())
+          if (hasActiveFilters)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Wrap(
                 spacing: 8,
                 children: [
-                  if (_selectedCategory != null)
+                  if (selectedCategory != null)
                     _FilterChip(
-                      label: _selectedCategory!,
-                      onRemove: () => setState(() => _selectedCategory = null),
+                      label: selectedCategory,
+                      onRemove: () {
+                        ref.read(selectedCategoryProvider.notifier).state = null;
+                      },
                     ),
-                  if (_selectedDifficulty != null)
+                  if (selectedDifficulty != null)
                     _FilterChip(
-                      label: _selectedDifficulty!,
-                      onRemove: () => setState(() => _selectedDifficulty = null),
+                      label: selectedDifficulty,
+                      onRemove: () {
+                        ref.read(selectedDifficultyProvider.notifier).state = null;
+                      },
                     ),
                 ],
               ),
@@ -135,10 +143,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Navigate to create set screen
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Create workout coming soon...')),
-          );
+          context.go('/plans/create');
         },
         icon: const Icon(TablerIcons.plus),
         label: const Text('Create'),
@@ -148,21 +153,18 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
     );
   }
 
-  bool _hasActiveFilters() {
-    return _selectedCategory != null || _selectedDifficulty != null;
-  }
-
   void _showFilterSheet() {
+    final selectedCategory = ref.read(selectedCategoryProvider);
+    final selectedDifficulty = ref.read(selectedDifficultyProvider);
+
     showModalBottomSheet(
       context: context,
       builder: (context) => _FilterSheet(
-        selectedCategory: _selectedCategory,
-        selectedDifficulty: _selectedDifficulty,
+        selectedCategory: selectedCategory,
+        selectedDifficulty: selectedDifficulty,
         onApply: (category, difficulty) {
-          setState(() {
-            _selectedCategory = category;
-            _selectedDifficulty = difficulty;
-          });
+          ref.read(selectedCategoryProvider.notifier).state = category;
+          ref.read(selectedDifficultyProvider.notifier).state = difficulty;
           Navigator.pop(context);
         },
       ),
@@ -170,12 +172,14 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
   }
 
   void _showSortMenu() {
+    final currentSort = ref.read(sortByProvider);
+
     showModalBottomSheet(
       context: context,
       builder: (context) => _SortMenu(
-        currentSort: _sortBy,
+        currentSort: currentSort,
         onSelect: (sort) {
-          setState(() => _sortBy = sort);
+          ref.read(sortByProvider.notifier).state = sort;
           Navigator.pop(context);
         },
       ),
@@ -217,115 +221,93 @@ class _WorkoutList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Watch filtered workouts from repository
-    final mockWorkouts = _getMockWorkouts();
+    // Watch the appropriate provider based on source
+    final setsAsync = source == 'seed'
+        ? ref.watch(appSetsProvider)
+        : source == 'community'
+            ? ref.watch(communitySetsProvider)
+            : ref.watch(allSetsProvider);
 
-    if (mockWorkouts.isEmpty) {
-      return Center(
+    return setsAsync.when(
+      data: (sets) {
+        if (sets.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  TablerIcons.inbox,
+                  size: 64,
+                  color: ColorTokens.textSecondary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No workouts found',
+                  style: TextStyle(
+                    color: ColorTokens.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          itemCount: sets.length,
+          itemBuilder: (context, index) {
+            final set = sets[index];
+            return _WorkoutCard(
+              workoutSet: set,
+              onTap: () {
+                context.go('/plans/details/${set.uuid}');
+              },
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              TablerIcons.inbox,
+              TablerIcons.alert_circle,
               size: 64,
-              color: ColorTokens.textSecondary.withOpacity(0.5),
+              color: ColorTokens.error,
             ),
             const SizedBox(height: 16),
             Text(
-              'No workouts found',
+              'Error loading workouts',
               style: TextStyle(
                 color: ColorTokens.textSecondary,
                 fontSize: 16,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              style: TextStyle(
+                color: ColorTokens.textSecondary,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: mockWorkouts.length,
-      itemBuilder: (context, index) {
-        final workout = mockWorkouts[index];
-        return _WorkoutCard(
-          name: workout['name']!,
-          description: workout['description']!,
-          difficulty: workout['difficulty']!,
-          category: workout['category']!,
-          duration: workout['duration']!,
-          source: workout['source']!,
-          onTap: () {
-            // TODO: Navigate to workout details
-          },
-        );
-      },
+      ),
     );
-  }
-
-  List<Map<String, String>> _getMockWorkouts() {
-    return [
-      {
-        'name': 'Night Shift Quick Starter',
-        'description': 'Perfect 15-minute energizer for night shift workers',
-        'difficulty': 'Beginner',
-        'category': 'Cardio',
-        'duration': '15 min',
-        'source': 'App',
-      },
-      {
-        'name': 'Midnight Full Body Burn',
-        'description': 'Comprehensive full-body workout for late-night training',
-        'difficulty': 'Intermediate',
-        'category': 'Strength',
-        'duration': '30 min',
-        'source': 'App',
-      },
-      {
-        'name': 'Night Owl HIIT',
-        'description': 'High-intensity interval training for maximum calorie burn',
-        'difficulty': 'Advanced',
-        'category': 'Cardio',
-        'duration': '25 min',
-        'source': 'App',
-      },
-      {
-        'name': 'Late Night Wind Down',
-        'description': 'Gentle stretching and relaxation before bed',
-        'difficulty': 'Beginner',
-        'category': 'Flexibility',
-        'duration': '12 min',
-        'source': 'App',
-      },
-      {
-        'name': 'Graveyard Shift Strength',
-        'description': 'Build strength during the graveyard shift',
-        'difficulty': 'Intermediate',
-        'category': 'Strength',
-        'duration': '35 min',
-        'source': 'App',
-      },
-    ];
   }
 }
 
 /// Workout card widget
 class _WorkoutCard extends StatelessWidget {
-  final String name;
-  final String description;
-  final String difficulty;
-  final String category;
-  final String duration;
-  final String source;
+  final WorkoutSet workoutSet;
   final VoidCallback onTap;
 
   const _WorkoutCard({
-    required this.name,
-    required this.description,
-    required this.difficulty,
-    required this.category,
-    required this.duration,
-    required this.source,
+    required this.workoutSet,
     required this.onTap,
   });
 
@@ -356,7 +338,7 @@ class _WorkoutCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      name,
+                      workoutSet.name,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: ColorTokens.textPrimary,
                         fontWeight: FontWeight.bold,
@@ -364,13 +346,17 @@ class _WorkoutCard extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    source == 'Community'
+                    workoutSet.source == 'community'
                         ? TablerIcons.users
-                        : TablerIcons.star,
+                        : workoutSet.source == 'seed'
+                            ? TablerIcons.star
+                            : TablerIcons.user,
                     size: 16,
-                    color: source == 'Community'
+                    color: workoutSet.source == 'community'
                         ? ColorTokens.info
-                        : ColorTokens.accent,
+                        : workoutSet.source == 'seed'
+                            ? ColorTokens.accent
+                            : ColorTokens.warning,
                   ),
                 ],
               ),
@@ -378,14 +364,15 @@ class _WorkoutCard extends StatelessWidget {
               const SizedBox(height: 8),
 
               // Description
-              Text(
-                description,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: ColorTokens.textSecondary,
+              if (workoutSet.description != null)
+                Text(
+                  workoutSet.description!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: ColorTokens.textSecondary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
 
               const SizedBox(height: 12),
 
@@ -396,13 +383,13 @@ class _WorkoutCard extends StatelessWidget {
                 children: [
                   _Tag(
                     icon: TablerIcons.clock,
-                    label: duration,
+                    label: '${workoutSet.estimatedMinutes} min',
                   ),
                   _Tag(
-                    icon: _getCategoryIcon(category),
-                    label: category,
+                    icon: _getCategoryIcon(workoutSet.category),
+                    label: _capitalize(workoutSet.category),
                   ),
-                  _DifficultyTag(difficulty: difficulty),
+                  _DifficultyTag(difficulty: _capitalize(workoutSet.difficulty)),
                 ],
               ),
             ],
@@ -420,9 +407,16 @@ class _WorkoutCard extends StatelessWidget {
         return TablerIcons.barbell;
       case 'flexibility':
         return TablerIcons.yoga;
+      case 'hybrid':
+        return TablerIcons.activity;
       default:
         return TablerIcons.activity;
     }
+  }
+
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
   }
 }
 

@@ -7,7 +7,7 @@ part 'preferences_dao.g.dart';
 @DriftAccessor(tables: [Preferences])
 class PreferencesDao extends DatabaseAccessor<AppDatabase>
     with _$PreferencesDaoMixin {
-  PreferencesDao(AppDatabase db) : super(db);
+  PreferencesDao(super.db);
 
   // ========== Generic Get/Set ==========
   Future<String?> get(String key) async {

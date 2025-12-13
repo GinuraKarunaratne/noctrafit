@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/auth_provider.dart';
+import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/accessibility_palettes.dart';
 import '../../../app/theme/color_tokens.dart';
 
@@ -278,7 +281,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       Switch(
                         value: _ttsEnabled,
-                        activeColor: ColorTokens.accent,
+                        activeThumbColor: ColorTokens.accent,
                         onChanged: _toggleTts,
                       ),
                     ],
@@ -381,7 +384,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: 'Workout reminders and achievements',
               trailing: Switch(
                 value: true,
-                activeColor: ColorTokens.accent,
+                activeThumbColor: ColorTokens.accent,
                 onChanged: (value) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Coming soon')),
@@ -440,6 +443,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Coming soon')),
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // Account section
+            _SectionHeader(
+              icon: TablerIcons.user,
+              title: 'Account',
+              subtitle: 'User account and authentication',
+            ),
+
+            const SizedBox(height: 12),
+
+            // Email display
+            Consumer(
+              builder: (context, ref, child) {
+                final user = ref.watch(currentUserProvider);
+                return _SettingTile(
+                  icon: TablerIcons.mail,
+                  title: 'Email',
+                  subtitle: user?.email ?? 'Not signed in',
+                  trailing: const SizedBox.shrink(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // Logout button
+            Consumer(
+              builder: (context, ref, child) {
+                return _SettingTile(
+                  icon: TablerIcons.logout,
+                  title: 'Logout',
+                  subtitle: 'Sign out of your account',
+                  trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.error),
+                  onTap: () async {
+                    // Show confirmation dialog
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: ColorTokens.surface,
+                        title: const Text('Logout', style: TextStyle(color: ColorTokens.textPrimary)),
+                        content: const Text(
+                          'Are you sure you want to logout?',
+                          style: TextStyle(color: ColorTokens.textSecondary),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Logout', style: TextStyle(color: ColorTokens.error)),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true && context.mounted) {
+                      // Clear auth flag
+                      final prefs = ref.read(preferencesRepositoryProvider);
+                      await prefs.setBool('was_authenticated', false);
+
+                      // Sign out
+                      final auth = ref.read(firebaseAuthProvider);
+                      await auth.signOut();
+
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    }
+                  },
                 );
               },
             ),

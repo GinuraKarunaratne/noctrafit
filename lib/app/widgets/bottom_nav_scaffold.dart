@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
+import 'package:noctrafit/features/session/widgets/active_session_mini_bar.dart';
 
 /// Bottom navigation scaffold for 5 main tabs
 /// Wraps the stateful shell navigation
@@ -20,13 +21,13 @@ class BottomNavScaffold extends StatelessWidget {
           // Main content (tab screens)
           navigationShell,
 
-          // TODO: Add ActiveSessionMiniBar (CW5) here when implemented
-          // Positioned(
-          //   top: 0,
-          //   left: 0,
-          //   right: 0,
-          //   child: const ActiveSessionMiniBar(),
-          // ),
+          // Active session mini bar overlay
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ActiveSessionMiniBar(),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

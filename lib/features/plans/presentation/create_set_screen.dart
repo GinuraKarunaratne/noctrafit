@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
-import 'package:uuid/uuid.dart';
 
+import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 
 /// UF2: Create Set Screen - Add custom workout sets
@@ -104,20 +107,16 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
       return;
     }
 
-    final workoutSetUuid = const Uuid().v4();
-
-    // TODO: Save to database
-    // final workoutSet = WorkoutSet(
-    //   uuid: workoutSetUuid,
-    //   name: _nameController.text,
-    //   description: _descriptionController.text,
-    //   difficulty: _difficulty,
-    //   category: _category,
-    //   estimatedMinutes: _estimatedMinutes,
-    //   exercises: jsonEncode(_selectedExercises),
-    //   source: 'user',
-    // );
-    // await ref.read(setsRepositoryProvider).createCustomSet(workoutSet);
+    // Save to database
+    await ref.read(setsRepositoryProvider).createCustomSet(
+      name: _nameController.text.trim(),
+      description: _descriptionController.text.trim(),
+      difficulty: _difficulty.toLowerCase(),
+      category: _category.toLowerCase(),
+      estimatedMinutes: _estimatedMinutes,
+      exercisesJson: jsonEncode(_selectedExercises),
+      authorName: null,
+    );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -126,7 +125,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
           backgroundColor: ColorTokens.success,
         ),
       );
-      Navigator.pop(context);
+      context.pop();
     }
   }
 
@@ -172,13 +171,19 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
 
     if (confirmed != true) return;
 
-    final workoutSetUuid = const Uuid().v4();
+    // Save locally first
+    final workoutSet = await ref.read(setsRepositoryProvider).createCustomSet(
+      name: _nameController.text.trim(),
+      description: _descriptionController.text.trim(),
+      difficulty: _difficulty.toLowerCase(),
+      category: _category.toLowerCase(),
+      estimatedMinutes: _estimatedMinutes,
+      exercisesJson: jsonEncode(_selectedExercises),
+      authorName: null,
+    );
 
-    // TODO: Save locally + publish to Firestore
-    // 1. Save to local database with source='user'
-    // 2. If online: upload to Firestore community_sets collection
-    // 3. If offline: queue in sync_queue for later upload
-    // await ref.read(setsRepositoryProvider).publishToCommunity(workoutSet);
+    // Queue for community upload (will sync to Firestore when online)
+    await ref.read(setsRepositoryProvider).queueForCommunityUpload(workoutSet);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,7 +192,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
           backgroundColor: ColorTokens.success,
         ),
       );
-      Navigator.pop(context);
+      context.pop();
     }
   }
 
@@ -310,7 +315,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
-                          value: _difficulty,
+                          initialValue: _difficulty,
                           style: const TextStyle(color: ColorTokens.textPrimary),
                           dropdownColor: ColorTokens.surface,
                           decoration: InputDecoration(
@@ -352,7 +357,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
-                          value: _category,
+                          initialValue: _category,
                           style: const TextStyle(color: ColorTokens.textPrimary),
                           dropdownColor: ColorTokens.surface,
                           decoration: InputDecoration(

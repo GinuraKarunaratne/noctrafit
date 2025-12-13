@@ -36,7 +36,7 @@ class FirestoreClient {
   /// Enable offline persistence
   Future<void> enablePersistence() async {
     try {
-      await _firestore.settings.persistenceEnabled;
+      _firestore.settings.persistenceEnabled;
       _logger.i('Firestore offline persistence enabled');
     } catch (e) {
       _logger.w('Firestore offline persistence already enabled or not supported: $e');

@@ -1,15 +1,25 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../local/db/app_database.dart';
 import '../local/db/daos/active_session_dao.dart';
 import '../local/db/daos/completion_logs_dao.dart';
+import '../remote/firestore/user_remote_datasource.dart';
 
 /// Repository for active workout session management
 class SessionRepository {
   final ActiveSessionDao _sessionDao;
   final CompletionLogsDao _logsDao;
+  final UserRemoteDataSource? _userRemote;
+  final FirebaseAuth? _auth;
 
-  SessionRepository(this._sessionDao, this._logsDao);
+  SessionRepository(
+    this._sessionDao,
+    this._logsDao, {
+    UserRemoteDataSource? userRemote,
+    FirebaseAuth? auth,
+  })  : _userRemote = userRemote,
+        _auth = auth;
 
   // ========== Read ==========
   Future<ActiveSession?> getActiveSession() => _sessionDao.getActiveSession();
@@ -81,10 +91,11 @@ class SessionRepository {
 
     final now = DateTime.now();
     final duration = now.difference(session.startedAt);
+    final logUuid = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Create completion log
+    // Create completion log locally
     await _logsDao.insertLog(CompletionLogsCompanion(
-      uuid: Value(DateTime.now().millisecondsSinceEpoch.toString()),
+      uuid: Value(logUuid),
       workoutSetId: Value(session.workoutSetId),
       scheduleEntryId: const Value(null), // TODO: Link if scheduled
       startedAt: Value(session.startedAt),
@@ -94,6 +105,29 @@ class SessionRepository {
       notes: const Value(null),
       createdAt: Value(now),
     ));
+
+    // Sync to Firestore if user is logged in
+    final user = _auth?.currentUser;
+    if (user != null && _userRemote != null) {
+      try {
+        await _userRemote.syncCompletionLog(
+          userId: user.uid,
+          logUuid: logUuid,
+          data: {
+            'workout_set_id': session.workoutSetId,
+            'workout_set_name': session.workoutSetName,
+            'started_at': session.startedAt.toIso8601String(),
+            'completed_at': now.toIso8601String(),
+            'duration_seconds': duration.inSeconds,
+            'exercises_completed': session.completedExercises,
+            'created_at': now.toIso8601String(),
+          },
+        );
+      } catch (e) {
+        // Log error but don't fail the completion
+        // The completion log is saved locally, sync can retry later
+      }
+    }
 
     // Clear active session
     await _sessionDao.clearSession();

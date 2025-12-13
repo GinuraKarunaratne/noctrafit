@@ -5,7 +5,7 @@ import '../../../app/theme/color_tokens.dart';
 ///
 /// Features:
 /// - Time-based suggestions (night = meditation, evening = stretch, etc.)
-/// - Dismissible with tiny X button (top-left)
+/// - Dismissible with swipe gesture
 /// - Gradient background with luminous green accent
 /// - Fully reusable with custom data
 ///
@@ -90,8 +90,8 @@ class AdaptiveBannerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.all(16),
+    final content = Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -114,111 +114,131 @@ class AdaptiveBannerCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // Dismiss button (tiny X, top-left)
-          if (onDismiss != null)
-            Positioned(
-              top: 8,
-              left: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, size: 16),
-                color: ColorTokens.textSecondary,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 24,
-                  minHeight: 24,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ColorTokens.accent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onPressed: onDismiss,
+                child: Icon(
+                  icon,
+                  color: ColorTokens.accent,
+                  size: 32,
+                ),
               ),
-            ),
 
-          // Main content
-          InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  // Icon
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: ColorTokens.accent.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 16),
+
+              // Text content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: ColorTokens.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    child: Icon(
-                      icon,
-                      color: ColorTokens.accent,
-                      size: 32,
-                    ),
-                  ),
-
-                  const SizedBox(width: 16),
-
-                  // Text content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: ColorTokens.textPrimary,
-                            fontWeight: FontWeight.bold,
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: ColorTokens.textSecondary,
+                        ),
+                      ),
+                    ],
+                    if (workoutName != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ColorTokens.accent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: ColorTokens.accent.withOpacity(0.4),
                           ),
                         ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            subtitle!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: ColorTokens.textSecondary,
-                            ),
+                        child: Text(
+                          workoutName!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: ColorTokens.accent,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
-                        if (workoutName != null) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ColorTokens.accent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: ColorTokens.accent.withOpacity(0.4),
-                              ),
-                            ),
-                            child: Text(
-                              workoutName!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: ColorTokens.accent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // Arrow icon (if tappable)
-                  if (onTap != null)
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      color: ColorTokens.accent,
-                      size: 16,
-                    ),
-                ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
+
+              // Arrow icon (if tappable)
+              if (onTap != null)
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: ColorTokens.accent,
+                  size: 16,
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
+
+    // Wrap in Dismissible if onDismiss is provided
+    if (onDismiss != null) {
+      return Dismissible(
+        key: ValueKey('adaptive_banner_${DateTime.now().millisecondsSinceEpoch}'),
+        direction: DismissDirection.horizontal,
+        onDismissed: (direction) {
+          onDismiss?.call();
+        },
+        background: Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          decoration: BoxDecoration(
+            color: ColorTokens.error.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 20),
+          child: const Icon(
+            Icons.delete_outline,
+            color: ColorTokens.error,
+            size: 28,
+          ),
+        ),
+        secondaryBackground: Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          decoration: BoxDecoration(
+            color: ColorTokens.error.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Icon(
+            Icons.delete_outline,
+            color: ColorTokens.error,
+            size: 28,
+          ),
+        ),
+        child: content,
+      );
+    }
+
+    return content;
   }
 }

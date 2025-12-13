@@ -7,7 +7,7 @@ part 'schedule_dao.g.dart';
 @DriftAccessor(tables: [ScheduleEntries])
 class ScheduleDao extends DatabaseAccessor<AppDatabase>
     with _$ScheduleDaoMixin {
-  ScheduleDao(AppDatabase db) : super(db);
+  ScheduleDao(super.db);
 
   // Create
   Future<int> insertEntry(ScheduleEntriesCompanion entry) {

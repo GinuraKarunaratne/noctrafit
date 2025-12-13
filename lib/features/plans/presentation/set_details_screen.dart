@@ -1,9 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
-import 'package:uuid/uuid.dart';
 
+import '../../../app/providers/auth_provider.dart';
+import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
+import '../../../data/local/db/app_database.dart';
+import '../../../data/remote/firestore/user_remote_datasource.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Set Details Screen - View workout set details
 ///
@@ -26,94 +33,89 @@ class SetDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
-  bool _isFavorite = false;
-
-  // Mock data - will be replaced with actual data from provider
-  final Map<String, dynamic> _workoutSet = {
-    'uuid': 'ws-001',
-    'name': 'Night Shift Quick Starter',
-    'description':
-        'Perfect 15-minute energizer designed for night shift workers. Get your blood flowing with this quick cardio and strength combo.',
-    'difficulty': 'Beginner',
-    'category': 'Cardio',
-    'estimatedMinutes': 15,
-    'source': 'App',
-    'exercises': [
-      {
-        'name': 'Jumping Jacks',
-        'sets': 3,
-        'reps': 20,
-        'rest': '30s',
-        'muscleGroup': 'Full Body',
-        'equipment': 'None',
-      },
-      {
-        'name': 'Push-ups',
-        'sets': 3,
-        'reps': 12,
-        'rest': '30s',
-        'muscleGroup': 'Chest',
-        'equipment': 'None',
-      },
-      {
-        'name': 'Squats',
-        'sets': 3,
-        'reps': 15,
-        'rest': '30s',
-        'muscleGroup': 'Legs',
-        'equipment': 'None',
-      },
-      {
-        'name': 'Plank',
-        'sets': 3,
-        'duration': '45s',
-        'rest': '30s',
-        'muscleGroup': 'Core',
-        'equipment': 'None',
-      },
-    ],
-  };
+  WorkoutSet? _workoutSet;
+  List<Map<String, dynamic>> _exercises = [];
 
   @override
   void initState() {
     super.initState();
+    _loadWorkoutSet();
+  }
 
-    // TODO: Load workout set from provider
-    // final workoutSet = ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
-    // _isFavorite = workoutSet.isFavorite;
+  // ✅ Safe helpers to avoid Null -> String crashes
+  String _safeString(dynamic v, {String fallback = 'Unknown exercise'}) {
+    if (v == null) return fallback;
+    final s = v.toString().trim();
+    return s.isEmpty ? fallback : s;
+  }
+
+  int? _safeInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    return int.tryParse(v.toString());
+  }
+
+  Future<void> _loadWorkoutSet() async {
+    final set = await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
+    if (set != null && mounted) {
+      setState(() {
+        _workoutSet = set;
+        // Parse exercises JSON
+        try {
+          final exercisesJson = jsonDecode(set.exercises) as List<dynamic>;
+          _exercises = exercisesJson.cast<Map<String, dynamic>>();
+        } catch (e) {
+          _exercises = [];
+        }
+      });
+    }
   }
 
   Future<void> _toggleFavorite() async {
+    if (_workoutSet == null) return;
+
+    final newFavoriteStatus = !_workoutSet!.isFavorite;
+
+    // Update local state immediately
     setState(() {
-      _isFavorite = !_isFavorite;
+      _workoutSet = _workoutSet!.copyWith(isFavorite: newFavoriteStatus);
     });
 
-    // TODO: Update favorite status in database
-    // await ref.read(setsRepositoryProvider).toggleFavorite(widget.workoutSetUuid, _isFavorite);
+    // Update in database
+    await ref.read(setsRepositoryProvider).toggleFavorite(_workoutSet!.id, newFavoriteStatus);
+
+    // Update Firestore favorites if user is authenticated
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      final userDataSource = UserRemoteDataSource(FirebaseFirestore.instance);
+      try {
+        if (newFavoriteStatus) {
+          await userDataSource.addFavorite(user.uid, widget.workoutSetUuid);
+        } else {
+          await userDataSource.removeFavorite(user.uid, widget.workoutSetUuid);
+        }
+      } catch (e) {
+        // Offline - will sync later
+      }
+    }
   }
 
   Future<void> _startWorkout() async {
-    // Generate session UUID
-    final sessionUuid = const Uuid().v4();
+    if (_workoutSet == null) return;
 
-    // TODO: Create active session in database
-    // await ref.read(sessionRepositoryProvider).startSession(
-    //   sessionUuid: sessionUuid,
-    //   workoutSetId: widget.workoutSetUuid,
-    // );
+    // Create active session in database
+    await ref.read(sessionRepositoryProvider).startSession(
+      workoutSetId: _workoutSet!.id,
+      workoutSetName: _workoutSet!.name,
+      totalExercises: _exercises.length,
+      estimatedMinutes: _workoutSet!.estimatedMinutes,
+    );
 
-    // Navigate to active session screen
-    if (mounted) {
-      // TODO: Use go_router navigation
-      // context.go('/session/$sessionUuid');
-
-      // For now, show snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Starting workout: ${_workoutSet['name']}'),
-          backgroundColor: ColorTokens.success,
-        ),
-      );
+    // Get the created session to get its UUID
+    final session = await ref.read(sessionRepositoryProvider).getActiveSession();
+    if (session != null && mounted) {
+      // Navigate to active session screen
+      context.go('/session/${session.sessionUuid}');
     }
   }
 
@@ -134,8 +136,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              'Workout scheduled for ${result['date'].toString().split(' ')[0]}'),
+          content: Text('Workout scheduled for ${result['date'].toString().split(' ')[0]}'),
           backgroundColor: ColorTokens.success,
         ),
       );
@@ -145,7 +146,19 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final exercises = _workoutSet['exercises'] as List<Map<String, dynamic>>;
+
+    // Show loading state if workout set not loaded yet
+    if (_workoutSet == null) {
+      return Scaffold(
+        backgroundColor: ColorTokens.background,
+        appBar: AppBar(
+          title: const Text('Loading...'),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
@@ -157,21 +170,19 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             pinned: true,
             backgroundColor: ColorTokens.background,
             leading: IconButton(
-              icon: const Icon(TablerIcons.arrow_left,
-                  color: ColorTokens.textPrimary),
+              icon: const Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
                 icon: Icon(
-                  _isFavorite ? TablerIcons.heart_filled : TablerIcons.heart,
-                  color: _isFavorite ? ColorTokens.error : ColorTokens.textPrimary,
+                  _workoutSet!.isFavorite ? TablerIcons.heart_filled : TablerIcons.heart,
+                  color: _workoutSet!.isFavorite ? ColorTokens.error : ColorTokens.textPrimary,
                 ),
                 onPressed: _toggleFavorite,
               ),
               IconButton(
-                icon: const Icon(TablerIcons.share,
-                    color: ColorTokens.textPrimary),
+                icon: const Icon(TablerIcons.share, color: ColorTokens.textPrimary),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Share workout')),
@@ -199,7 +210,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Text(
-                          _workoutSet['name'],
+                          _workoutSet!.name,
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: ColorTokens.textPrimary,
                             fontWeight: FontWeight.bold,
@@ -211,15 +222,15 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                           children: [
                             _InfoChip(
                               icon: TablerIcons.clock,
-                              label: '${_workoutSet['estimatedMinutes']} min',
+                              label: '${_workoutSet!.estimatedMinutes} min',
                             ),
                             _InfoChip(
                               icon: TablerIcons.trending_up,
-                              label: _workoutSet['difficulty'],
+                              label: _capitalize(_workoutSet!.difficulty),
                             ),
                             _InfoChip(
                               icon: TablerIcons.tag,
-                              label: _workoutSet['category'],
+                              label: _capitalize(_workoutSet!.category),
                             ),
                           ],
                         ),
@@ -239,23 +250,24 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Description
-                  Text(
-                    'About',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: ColorTokens.textPrimary,
-                      fontWeight: FontWeight.bold,
+                  if (_workoutSet!.description != null) ...[
+                    Text(
+                      'About',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: ColorTokens.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _workoutSet['description'],
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: ColorTokens.textSecondary,
-                      height: 1.5,
+                    const SizedBox(height: 8),
+                    Text(
+                      _workoutSet!.description!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: ColorTokens.textSecondary,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
+                  ],
 
                   // Exercises header
                   Row(
@@ -269,8 +281,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -280,7 +291,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                           ),
                         ),
                         child: Text(
-                          '${exercises.length} exercises',
+                          '${_exercises.length} exercises',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: ColorTokens.accent,
                             fontWeight: FontWeight.w600,
@@ -292,19 +303,20 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Exercise list
-                  ...exercises.asMap().entries.map((entry) {
+                  // ✅ Exercise list (SAFE)
+                  ..._exercises.asMap().entries.map((entry) {
                     final index = entry.key;
                     final exercise = entry.value;
+
                     return _ExerciseCard(
                       number: index + 1,
-                      name: exercise['name'],
-                      sets: exercise['sets'],
-                      reps: exercise['reps'],
-                      duration: exercise['duration'],
-                      rest: exercise['rest'],
-                      muscleGroup: exercise['muscleGroup'],
-                      equipment: exercise['equipment'],
+                      name: _safeString(exercise['name']), // ✅ fixed (was crashing)
+                      sets: _safeInt(exercise['sets']),
+                      reps: _safeInt(exercise['reps']),
+                      duration: exercise['duration']?.toString(),
+                      rest: exercise['rest']?.toString(),
+                      muscleGroup: exercise['muscleGroup']?.toString(),
+                      equipment: exercise['equipment']?.toString(),
                     );
                   }),
 
@@ -373,8 +385,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(TablerIcons.player_play,
-                          color: ColorTokens.background),
+                      Icon(TablerIcons.player_play, color: ColorTokens.background),
                       SizedBox(width: 8),
                       Text(
                         'Start Workout',
@@ -393,6 +404,11 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         ),
       ),
     );
+  }
+
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
   }
 }
 
@@ -727,7 +743,10 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: ColorTokens.textSecondary),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -744,7 +763,10 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
           ),
           child: const Text(
             'Schedule',
-            style: TextStyle(color: ColorTokens.background, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: ColorTokens.background,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
