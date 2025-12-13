@@ -1,0 +1,238 @@
+{
+  "exercises": [
+    {
+      "uuid": "ex-001",
+      "name": "Push-ups",
+      "muscle_group": "chest",
+      "equipment": "bodyweight",
+      "instructions": "Start in a plank position with hands shoulder-width apart. Lower your body until chest nearly touches the floor, then push back up."
+    },
+    {
+      "uuid": "ex-002",
+      "name": "Squats",
+      "muscle_group": "legs",
+      "equipment": "bodyweight",
+      "instructions": "Stand with feet shoulder-width apart. Lower your hips back and down as if sitting in a chair, keeping chest up. Return to standing."
+    },
+    {
+      "uuid": "ex-003",
+      "name": "Plank",
+      "muscle_group": "core",
+      "equipment": "bodyweight",
+      "instructions": "Hold a push-up position with body in a straight line from head to heels. Engage core and hold."
+    },
+    {
+      "uuid": "ex-004",
+      "name": "Lunges",
+      "muscle_group": "legs",
+      "equipment": "bodyweight",
+      "instructions": "Step forward with one leg, lowering hips until both knees are bent at 90 degrees. Push back to start and repeat."
+    },
+    {
+      "uuid": "ex-005",
+      "name": "Mountain Climbers",
+      "muscle_group": "cardio",
+      "equipment": "bodyweight",
+      "instructions": "Start in plank position. Quickly alternate bringing knees to chest in a running motion."
+    },
+    {
+      "uuid": "ex-006",
+      "name": "Burpees",
+      "muscle_group": "cardio",
+      "equipment": "bodyweight",
+      "instructions": "From standing, drop into squat, kick feet back to plank, do a push-up, jump feet to hands, and jump up."
+    },
+    {
+      "uuid": "ex-007",
+      "name": "Sit-ups",
+      "muscle_group": "core",
+      "equipment": "bodyweight",
+      "instructions": "Lie on back with knees bent. Lift torso up toward knees, then lower back down with control."
+    },
+    {
+      "uuid": "ex-008",
+      "name": "Jumping Jacks",
+      "muscle_group": "cardio",
+      "equipment": "bodyweight",
+      "instructions": "Jump feet apart while raising arms overhead. Jump feet together while lowering arms to sides."
+    },
+    {
+      "uuid": "ex-009",
+      "name": "Tricep Dips",
+      "muscle_group": "arms",
+      "equipment": "bodyweight",
+      "instructions": "Using a chair or bench, lower body by bending elbows, then push back up."
+    },
+    {
+      "uuid": "ex-010",
+      "name": "Wall Sit",
+      "muscle_group": "legs",
+      "equipment": "bodyweight",
+      "instructions": "Lean against wall and slide down until thighs are parallel to ground. Hold position."
+    },
+    {
+      "uuid": "ex-011",
+      "name": "Child's Pose",
+      "muscle_group": "flexibility",
+      "equipment": "bodyweight",
+      "instructions": "Kneel and sit back on heels. Extend arms forward and lower chest to ground. Breathe deeply."
+    },
+    {
+      "uuid": "ex-012",
+      "name": "Cat-Cow Stretch",
+      "muscle_group": "flexibility",
+      "equipment": "bodyweight",
+      "instructions": "On hands and knees, alternate arching back (cat) and dropping belly (cow) while breathing."
+    }
+  ],
+  "workout_sets": [
+    {
+      "uuid": "ws-001",
+      "name": "Night Shift Quick Starter",
+      "description": "Perfect 15-minute energizer for night shift workers needing a quick boost",
+      "difficulty": "beginner",
+      "category": "cardio",
+      "estimated_minutes": 15,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-008", "sets": 3, "reps": 20, "rest_sec": 30},
+        {"exercise_uuid": "ex-005", "sets": 3, "reps": 15, "rest_sec": 30},
+        {"exercise_uuid": "ex-001", "sets": 3, "reps": 10, "rest_sec": 30}
+      ]
+    },
+    {
+      "uuid": "ws-002",
+      "name": "Midnight Full Body Burn",
+      "description": "Comprehensive full-body workout designed for late-night training",
+      "difficulty": "intermediate",
+      "category": "strength",
+      "estimated_minutes": 30,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-001", "sets": 4, "reps": 15, "rest_sec": 60},
+        {"exercise_uuid": "ex-002", "sets": 4, "reps": 20, "rest_sec": 60},
+        {"exercise_uuid": "ex-004", "sets": 3, "reps": 12, "rest_sec": 45},
+        {"exercise_uuid": "ex-003", "duration_sec": 45, "sets": 3, "rest_sec": 30},
+        {"exercise_uuid": "ex-007", "sets": 3, "reps": 15, "rest_sec": 45}
+      ]
+    },
+    {
+      "uuid": "ws-003",
+      "name": "Night Owl HIIT",
+      "description": "High-intensity interval training for maximum calorie burn during night hours",
+      "difficulty": "advanced",
+      "category": "cardio",
+      "estimated_minutes": 25,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-006", "sets": 4, "reps": 10, "rest_sec": 30},
+        {"exercise_uuid": "ex-005", "sets": 4, "reps": 20, "rest_sec": 30},
+        {"exercise_uuid": "ex-008", "sets": 4, "reps": 30, "rest_sec": 30},
+        {"exercise_uuid": "ex-002", "sets": 4, "reps": 15, "rest_sec": 30}
+      ]
+    },
+    {
+      "uuid": "ws-004",
+      "name": "Late Night Wind Down",
+      "description": "Gentle stretching and relaxation routine perfect before bed after a night shift",
+      "difficulty": "beginner",
+      "category": "flexibility",
+      "estimated_minutes": 12,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-011", "duration_sec": 90, "sets": 1, "rest_sec": 15},
+        {"exercise_uuid": "ex-012", "sets": 2, "reps": 10, "rest_sec": 20},
+        {"exercise_uuid": "ex-010", "duration_sec": 60, "sets": 2, "rest_sec": 30}
+      ]
+    },
+    {
+      "uuid": "ws-005",
+      "name": "Graveyard Shift Strength",
+      "description": "Build strength during the graveyard shift with this targeted routine",
+      "difficulty": "intermediate",
+      "category": "strength",
+      "estimated_minutes": 35,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-001", "sets": 5, "reps": 12, "rest_sec": 60},
+        {"exercise_uuid": "ex-002", "sets": 5, "reps": 15, "rest_sec": 60},
+        {"exercise_uuid": "ex-004", "sets": 4, "reps": 10, "rest_sec": 45},
+        {"exercise_uuid": "ex-009", "sets": 4, "reps": 12, "rest_sec": 45},
+        {"exercise_uuid": "ex-007", "sets": 4, "reps": 20, "rest_sec": 40}
+      ]
+    },
+    {
+      "uuid": "ws-006",
+      "name": "3AM Core Crusher",
+      "description": "Focused core workout when you need to stay alert and engaged",
+      "difficulty": "intermediate",
+      "category": "strength",
+      "estimated_minutes": 20,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-003", "duration_sec": 60, "sets": 4, "rest_sec": 30},
+        {"exercise_uuid": "ex-007", "sets": 4, "reps": 20, "rest_sec": 30},
+        {"exercise_uuid": "ex-005", "sets": 4, "reps": 15, "rest_sec": 30}
+      ]
+    },
+    {
+      "uuid": "ws-007",
+      "name": "Midnight Meditation Flow",
+      "description": "Calming meditation and gentle movement for mental clarity during night hours",
+      "difficulty": "beginner",
+      "category": "flexibility",
+      "estimated_minutes": 10,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-011", "duration_sec": 120, "sets": 1, "rest_sec": 20},
+        {"exercise_uuid": "ex-012", "sets": 3, "reps": 8, "rest_sec": 20},
+        {"exercise_uuid": "ex-003", "duration_sec": 45, "sets": 2, "rest_sec": 15}
+      ]
+    },
+    {
+      "uuid": "ws-008",
+      "name": "Night Shift Energy Boost",
+      "description": "Quick energy boost to power through the second half of your night shift",
+      "difficulty": "beginner",
+      "category": "cardio",
+      "estimated_minutes": 10,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-008", "sets": 2, "reps": 25, "rest_sec": 20},
+        {"exercise_uuid": "ex-005", "sets": 2, "reps": 12, "rest_sec": 20},
+        {"exercise_uuid": "ex-002", "sets": 2, "reps": 15, "rest_sec": 20}
+      ]
+    },
+    {
+      "uuid": "ws-009",
+      "name": "Post-Shift Recovery Stretch",
+      "description": "Essential stretches to recover and decompress after a long night shift",
+      "difficulty": "beginner",
+      "category": "flexibility",
+      "estimated_minutes": 15,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-011", "duration_sec": 90, "sets": 2, "rest_sec": 15},
+        {"exercise_uuid": "ex-012", "sets": 3, "reps": 10, "rest_sec": 15},
+        {"exercise_uuid": "ex-010", "duration_sec": 45, "sets": 3, "rest_sec": 20}
+      ]
+    },
+    {
+      "uuid": "ws-010",
+      "name": "Nocturnal Warrior Circuit",
+      "description": "Advanced full-body circuit for serious night-time training",
+      "difficulty": "advanced",
+      "category": "strength",
+      "estimated_minutes": 40,
+      "source": "seed",
+      "exercises": [
+        {"exercise_uuid": "ex-006", "sets": 5, "reps": 12, "rest_sec": 45},
+        {"exercise_uuid": "ex-001", "sets": 5, "reps": 20, "rest_sec": 45},
+        {"exercise_uuid": "ex-002", "sets": 5, "reps": 25, "rest_sec": 45},
+        {"exercise_uuid": "ex-004", "sets": 4, "reps": 15, "rest_sec": 40},
+        {"exercise_uuid": "ex-003", "duration_sec": 60, "sets": 4, "rest_sec": 30},
+        {"exercise_uuid": "ex-009", "sets": 4, "reps": 15, "rest_sec": 40}
+      ]
+    }
+  ]
+}
