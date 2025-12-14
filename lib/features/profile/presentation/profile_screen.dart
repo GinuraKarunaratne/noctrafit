@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/auth_provider.dart';
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../app/widgets/composite/stats_grid.dart';
 import '../providers/profile_providers.dart';
@@ -62,23 +63,31 @@ class ProfileScreen extends ConsumerWidget {
                   Consumer(
                     builder: (context, ref, child) {
                       final user = ref.watch(currentUserProvider);
-                      return Column(
-                        children: [
-                          Text(
-                            user?.email?.split('@').first ?? 'User',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              color: ColorTokens.textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user?.email ?? '',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: ColorTokens.textSecondary,
-                            ),
-                          ),
-                        ],
+                      return FutureBuilder<String?>(
+                        future: user != null
+                            ? ref.read(userRemoteDataSourceProvider).getUserProfile(user.uid).then((profile) => profile?['display_name'] as String?)
+                            : Future.value(null),
+                        builder: (context, snapshot) {
+                          final displayName = snapshot.data ?? user?.email?.split('@').first ?? 'User';
+                          return Column(
+                            children: [
+                              Text(
+                                displayName,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: ColorTokens.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                user?.email ?? '',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: ColorTokens.textSecondary,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),

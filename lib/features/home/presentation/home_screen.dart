@@ -7,6 +7,7 @@ import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../app/widgets/composite/stats_grid.dart';
 import '../../../data/local/db/app_database.dart';
+import '../providers/home_providers.dart';
 import '../widgets/adaptive_banner_card.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -81,7 +82,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-            StatsGrid(stats: _getMockWeeklyStats()),
+            Consumer(
+              builder: (context, ref, child) {
+                final weeklyStatsAsync = ref.watch(weeklyStatsProvider);
+                return weeklyStatsAsync.when(
+                  data: (stats) => StatsGrid(stats: stats),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const SizedBox.shrink(),
+                );
+              },
+            ),
 
             const SizedBox(height: 16),
 
@@ -136,32 +146,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  List<StatData> _getMockWeeklyStats() {
-    return const [
-      StatData(
-        value: '0',
-        label: 'Workouts',
-        icon: TablerIcons.barbell,
-      ),
-      StatData(
-        value: '0',
-        label: 'Minutes',
-        icon: TablerIcons.clock,
-      ),
-      StatData(
-        value: '0',
-        label: 'Streak',
-        icon: TablerIcons.flame,
-        iconColor: ColorTokens.warning,
-      ),
-      StatData(
-        value: '0%',
-        label: 'Completion',
-        icon: TablerIcons.chart_pie,
-        iconColor: ColorTokens.success,
-      ),
-    ];
-  }
 }
 
 class _WorkoutCard extends StatelessWidget {
