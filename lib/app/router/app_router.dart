@@ -20,20 +20,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
 
   return GoRouter(
-    initialLocation: '/home',
+    initialLocation: '/login',
     debugLogDiagnostics: true,
     redirect: (context, state) {
       final isAuthenticated = authState.value != null;
       final isOnAuthScreen = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
 
-      // For offline-first approach, we allow navigation even when not authenticated
-      // The was_authenticated flag is checked in login/signup to allow offline mode
-      // In production, you'd want proper async handling of preferences here
-
       if (!isAuthenticated && !isOnAuthScreen) {
-        // For MVP, we'll be permissive and allow navigation (offline-first)
-        // In production, you'd check wasAuthenticated flag from preferences
-        return null; // Allow navigation for now (offline-first)
+        return '/login';
       }
 
       if (isAuthenticated && isOnAuthScreen) {

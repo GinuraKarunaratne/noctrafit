@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/auth_provider.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../app/widgets/composite/stats_grid.dart';
 import '../widgets/progress_heatmap_card.dart';
@@ -24,12 +26,7 @@ class ProfileScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(TablerIcons.settings),
-            onPressed: () {
-              // TODO: Navigate to settings
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings coming soon...')),
-              );
-            },
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),
@@ -61,19 +58,28 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'Night Warrior',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: ColorTokens.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Member since Jan 2025',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: ColorTokens.textSecondary,
-                    ),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final user = ref.watch(currentUserProvider);
+                      return Column(
+                        children: [
+                          Text(
+                            user?.email?.split('@').first ?? 'User',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: ColorTokens.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            user?.email ?? '',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: ColorTokens.textSecondary,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

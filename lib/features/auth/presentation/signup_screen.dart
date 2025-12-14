@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:noctrafit/app/providers/auth_provider.dart';
 import 'package:noctrafit/app/providers/repository_providers.dart';
+import 'package:noctrafit/app/providers/service_providers.dart';
 import 'package:noctrafit/app/theme/color_tokens.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -47,13 +47,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       );
 
       // Create user profile in Firestore
-      final userId = credential.user!.uid;
-      await FirebaseFirestore.instance.collection('users').doc(userId).set({
-        'email': _emailController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastLoginAt': FieldValue.serverTimestamp(),
-        'displayName': null,
-      });
+      final userRemote = ref.read(userRemoteDataSourceProvider);
+      await userRemote.upsertUserProfile(
+        userId: credential.user!.uid,
+        email: _emailController.text.trim(),
+      );
 
       // Mark as authenticated in preferences for offline mode
       final prefs = ref.read(preferencesRepositoryProvider);

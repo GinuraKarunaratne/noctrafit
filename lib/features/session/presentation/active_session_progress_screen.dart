@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart'; // ✅ added
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/repository_providers.dart';
@@ -53,12 +54,32 @@ class _ActiveSessionProgressScreenState
     _startTimer();
   }
 
+  // ✅ Safe helpers to avoid Null -> String crashes
+  String _safeString(dynamic v, {String fallback = 'Unknown exercise'}) {
+    if (v == null) return fallback;
+    final s = v.toString().trim();
+    return s.isEmpty ? fallback : s;
+  }
+
+  int? _safeInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    return int.tryParse(v.toString());
+  }
+
+  String? _safeNullableString(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
   Future<void> _loadSession() async {
     final session = await ref.read(sessionRepositoryProvider).getActiveSession();
     if (session != null && mounted) {
       // Get all sets and find by ID
       final allSets = await ref.read(setsRepositoryProvider).getAllSets();
-      final workoutSet = allSets.firstWhere((set) => set.id == session.workoutSetId);
+      final workoutSet =
+          allSets.firstWhere((set) => set.id == session.workoutSetId);
 
       setState(() {
         _session = session;
@@ -110,7 +131,9 @@ class _ActiveSessionProgressScreenState
     }
 
     // 10 minutes remaining
-    if (remainingMinutes <= 10 && remainingMinutes > 9 && !_hasSpoken10MinRemaining) {
+    if (remainingMinutes <= 10 &&
+        remainingMinutes > 9 &&
+        !_hasSpoken10MinRemaining) {
       _hasSpoken10MinRemaining = true;
     }
   }
@@ -128,7 +151,9 @@ class _ActiveSessionProgressScreenState
   }
 
   void _nextExercise() async {
-    if (_session == null || _session!.currentExerciseIndex >= _exercises.length - 1) return;
+    if (_session == null || _session!.currentExerciseIndex >= _exercises.length - 1) {
+      return;
+    }
 
     await ref.read(sessionRepositoryProvider).progressToNextExercise();
     await _loadSession();
@@ -163,9 +188,9 @@ class _ActiveSessionProgressScreenState
         ),
       );
 
-      // Navigate back to home
+      // Navigate to home after completion
       if (mounted) {
-        Navigator.of(context).pop();
+        context.go('/home');
       }
     }
   }
@@ -188,8 +213,18 @@ class _ActiveSessionProgressScreenState
     }
 
     final currentExerciseIndex = _session!.currentExerciseIndex;
-    final currentExercise = _exercises[currentExerciseIndex];
+
+    // ✅ extra safety: clamp index just in case
+    final safeIndex = currentExerciseIndex.clamp(0, _exercises.length - 1);
+    final currentExercise = _exercises[safeIndex];
+
     final progress = _getProgressPercentage();
+
+    final exerciseName = _safeString(currentExercise['name']);
+    final sets = _safeInt(currentExercise['sets']);
+    final reps = _safeInt(currentExercise['reps']);
+    final duration = _safeNullableString(currentExercise['duration']);
+    final rest = _safeNullableString(currentExercise['rest']);
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
@@ -211,7 +246,10 @@ class _ActiveSessionProgressScreenState
               context: context,
               builder: (context) => AlertDialog(
                 backgroundColor: ColorTokens.surface,
-                title: const Text('End Workout?', style: TextStyle(color: ColorTokens.textPrimary)),
+                title: const Text(
+                  'End Workout?',
+                  style: TextStyle(color: ColorTokens.textPrimary),
+                ),
                 content: const Text(
                   'Are you sure you want to end this workout? Progress will be saved.',
                   style: TextStyle(color: ColorTokens.textSecondary),
@@ -223,8 +261,7 @@ class _ActiveSessionProgressScreenState
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('End',
-                        style: TextStyle(color: ColorTokens.error)),
+                    child: const Text('End', style: TextStyle(color: ColorTokens.error)),
                   ),
                 ],
               ),
@@ -233,8 +270,10 @@ class _ActiveSessionProgressScreenState
             if (confirmed == true && mounted) {
               _timer?.cancel();
               await ref.read(sessionRepositoryProvider).completeSession();
+
+              // ✅ GoRouter-safe: go home instead of popping last page
               if (mounted) {
-                Navigator.of(context).pop();
+                context.go('/'); // change to '/home' if your home route is different
               }
             }
           },
@@ -299,15 +338,14 @@ class _ActiveSessionProgressScreenState
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Exercise ${currentExerciseIndex + 1}/${_exercises.length}',
+                        'Exercise ${safeIndex + 1}/${_exercises.length}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: ColorTokens.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -328,7 +366,7 @@ class _ActiveSessionProgressScreenState
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    currentExercise['name'],
+                    exerciseName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       color: ColorTokens.textPrimary,
                       fontWeight: FontWeight.bold,
@@ -338,25 +376,25 @@ class _ActiveSessionProgressScreenState
                   Wrap(
                     spacing: 16,
                     children: [
-                      if (currentExercise['sets'] != null)
+                      if (sets != null)
                         _ExerciseDetail(
                           icon: TablerIcons.repeat,
-                          label: '${currentExercise['sets']} sets',
+                          label: '$sets sets',
                         ),
-                      if (currentExercise['reps'] != null)
+                      if (reps != null)
                         _ExerciseDetail(
                           icon: TablerIcons.number,
-                          label: '${currentExercise['reps']} reps',
+                          label: '$reps reps',
                         ),
-                      if (currentExercise['duration'] != null)
+                      if (duration != null)
                         _ExerciseDetail(
                           icon: TablerIcons.clock,
-                          label: currentExercise['duration'],
+                          label: duration,
                         ),
-                      if (currentExercise['rest'] != null)
+                      if (rest != null)
                         _ExerciseDetail(
                           icon: TablerIcons.clock_pause,
-                          label: 'Rest ${currentExercise['rest']}',
+                          label: 'Rest $rest',
                         ),
                     ],
                   ),
@@ -374,12 +412,11 @@ class _ActiveSessionProgressScreenState
                   // Previous button
                   Expanded(
                     child: OutlinedButton(
-                      onPressed:
-                          currentExerciseIndex > 0 ? _previousExercise : null,
+                      onPressed: safeIndex > 0 ? _previousExercise : null,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(
-                          color: currentExerciseIndex > 0
+                          color: safeIndex > 0
                               ? ColorTokens.border
                               : ColorTokens.border.withOpacity(0.3),
                         ),
@@ -392,17 +429,13 @@ class _ActiveSessionProgressScreenState
                         children: [
                           Icon(
                             TablerIcons.chevron_left,
-                            color: currentExerciseIndex > 0
-                                ? ColorTokens.textPrimary
-                                : ColorTokens.textSecondary,
+                            color: safeIndex > 0 ? ColorTokens.textPrimary : ColorTokens.textSecondary,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Previous',
                             style: TextStyle(
-                              color: currentExerciseIndex > 0
-                                  ? ColorTokens.textPrimary
-                                  : ColorTokens.textSecondary,
+                              color: safeIndex > 0 ? ColorTokens.textPrimary : ColorTokens.textSecondary,
                             ),
                           ),
                         ],
@@ -415,15 +448,12 @@ class _ActiveSessionProgressScreenState
                   // Next button
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: currentExerciseIndex < _exercises.length - 1
-                          ? _nextExercise
-                          : null,
+                      onPressed: safeIndex < _exercises.length - 1 ? _nextExercise : null,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor:
-                            currentExerciseIndex < _exercises.length - 1
-                                ? ColorTokens.accent
-                                : ColorTokens.surface,
+                        backgroundColor: safeIndex < _exercises.length - 1
+                            ? ColorTokens.accent
+                            : ColorTokens.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -434,20 +464,18 @@ class _ActiveSessionProgressScreenState
                           Text(
                             'Next',
                             style: TextStyle(
-                              color:
-                                  currentExerciseIndex < _exercises.length - 1
-                                      ? ColorTokens.background
-                                      : ColorTokens.textSecondary,
+                              color: safeIndex < _exercises.length - 1
+                                  ? ColorTokens.background
+                                  : ColorTokens.textSecondary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Icon(
                             TablerIcons.chevron_right,
-                            color:
-                                currentExerciseIndex < _exercises.length - 1
-                                    ? ColorTokens.background
-                                    : ColorTokens.textSecondary,
+                            color: safeIndex < _exercises.length - 1
+                                ? ColorTokens.background
+                                : ColorTokens.textSecondary,
                           ),
                         ],
                       ),
@@ -532,7 +560,6 @@ class _LuminousProgressRing extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Background ring
           CustomPaint(
             size: Size(size, size),
             painter: _ProgressRingPainter(
@@ -541,8 +568,6 @@ class _LuminousProgressRing extends StatelessWidget {
               strokeWidth: 12,
             ),
           ),
-
-          // Progress ring with glow
           CustomPaint(
             size: Size(size, size),
             painter: _ProgressRingPainter(
@@ -552,8 +577,6 @@ class _LuminousProgressRing extends StatelessWidget {
               showGlow: true,
             ),
           ),
-
-          // Center content
           child,
         ],
       ),
@@ -561,7 +584,6 @@ class _LuminousProgressRing extends StatelessWidget {
   }
 }
 
-/// Custom painter for progress ring
 class _ProgressRingPainter extends CustomPainter {
   final double progress;
   final Color color;
@@ -586,7 +608,6 @@ class _ProgressRingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    // Add glow effect for progress ring
     if (showGlow) {
       final glowPaint = Paint()
         ..color = color.withOpacity(0.3)
@@ -604,7 +625,6 @@ class _ProgressRingPainter extends CustomPainter {
       );
     }
 
-    // Draw arc
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
@@ -620,7 +640,6 @@ class _ProgressRingPainter extends CustomPainter {
   }
 }
 
-/// Exercise detail chip
 class _ExerciseDetail extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -754,7 +773,6 @@ class _CompletionDialog extends StatelessWidget {
   }
 }
 
-/// Completion stat widget
 class _CompletionStat extends StatelessWidget {
   final IconData icon;
   final String value;

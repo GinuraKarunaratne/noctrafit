@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:noctrafit/app/providers/auth_provider.dart';
 import 'package:noctrafit/app/providers/repository_providers.dart';
+import 'package:noctrafit/app/providers/service_providers.dart';
 import 'package:noctrafit/app/theme/color_tokens.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -35,9 +36,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final auth = ref.read(firebaseAuthProvider);
-      await auth.signInWithEmailAndPassword(
+      final credential = await auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+      );
+
+      // Update user profile in Firestore
+      final userRemote = ref.read(userRemoteDataSourceProvider);
+      await userRemote.upsertUserProfile(
+        userId: credential.user!.uid,
+        email: _emailController.text.trim(),
       );
 
       // Mark as authenticated in preferences for offline mode

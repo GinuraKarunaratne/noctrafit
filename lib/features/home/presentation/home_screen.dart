@@ -1,29 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../app/widgets/composite/stats_grid.dart';
+import '../../../data/local/db/app_database.dart';
 import '../widgets/adaptive_banner_card.dart';
 
-/// Home screen - Main dashboard with time-aware banner and stats
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Load real stats from insights repository
-    final weeklyStats = _getMockWeeklyStats();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
 
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  List<WorkoutSet> _trendingWorkouts = [];
+  bool _showBanner = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final prefs = ref.read(preferencesRepositoryProvider);
+    final showBanner = await prefs.getBool('show_home_banner') ?? true;
+
+    final setsRepo = ref.read(setsRepositoryProvider);
+    final sets = await setsRepo.getAllSets();
+
+    final trending = sets.where((s) => s.source == 'seed').take(3).toList();
+
+    if (mounted) {
+      setState(() {
+        _showBanner = showBanner;
+        _trendingWorkouts = trending;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('NoctraFit'),
         actions: [
           IconButton(
             icon: const Icon(TablerIcons.bell),
-            onPressed: () {
-              // TODO: Show notifications
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -31,31 +61,21 @@ class HomeScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // CW1: Time-aware adaptive banner
-            AdaptiveBannerCard.timeAware(
-              onTap: () {
-                // TODO: Navigate to suggested workout
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Starting suggested workout...'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              onDismiss: () {
-                // TODO: Save dismissal preference
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Banner dismissed'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-            ),
+            if (_showBanner)
+              AdaptiveBannerCard.timeAware(
+                onTap: () {
+                  if (_trendingWorkouts.isNotEmpty) {
+                    context.push('/plans/details/${_trendingWorkouts.first.uuid}');
+                  }
+                },
+                onDismiss: () async {
+                  await ref.read(preferencesRepositoryProvider).setBool('show_home_banner', false);
+                  setState(() => _showBanner = false);
+                },
+              ),
 
             const SizedBox(height: 8),
 
-            // Section: Weekly Overview
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -67,12 +87,10 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
-            // CW2: Stats Grid
-            StatsGrid(stats: weeklyStats),
+            StatsGrid(stats: _getMockWeeklyStats()),
 
             const SizedBox(height: 16),
 
-            // Section: Trending Workouts
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -86,9 +104,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                   ),
                   TextButton(
-                    onPressed: () {
-                      // TODO: Navigate to plans screen
-                    },
+                    onPressed: () => context.go('/plans'),
                     child: const Text('See All'),
                   ),
                 ],
@@ -97,8 +113,27 @@ class HomeScreen extends ConsumerWidget {
 
             const SizedBox(height: 8),
 
-            // Trending workout cards (placeholder)
-            _TrendingWorkoutsList(),
+            if (_isLoading)
+              const Center(child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ))
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _trendingWorkouts.length,
+                itemBuilder: (context, index) {
+                  final workout = _trendingWorkouts[index];
+                  return _WorkoutCard(
+                    name: workout.name,
+                    duration: '${workout.estimatedMinutes} min',
+                    difficulty: workout.difficulty,
+                    onTap: () => context.push('/plans/details/${workout.uuid}'),
+                  );
+                },
+              ),
 
             const SizedBox(height: 24),
           ],
@@ -108,84 +143,33 @@ class HomeScreen extends ConsumerWidget {
   }
 
   List<StatData> _getMockWeeklyStats() {
-    // TODO: Replace with real data from InsightsRepository
-    return [
-      const StatData(
-        value: '4',
+    return const [
+      StatData(
+        value: '0',
         label: 'Workouts',
         icon: TablerIcons.barbell,
-        trend: TrendData(
-          direction: TrendDirection.up,
-          value: '+2',
-          isPositive: true,
-        ),
       ),
-      const StatData(
-        value: '127',
+      StatData(
+        value: '0',
         label: 'Minutes',
         icon: TablerIcons.clock,
-        trend: TrendData(
-          direction: TrendDirection.up,
-          value: '+15%',
-          isPositive: true,
-        ),
       ),
-      const StatData(
-        value: '3',
+      StatData(
+        value: '0',
         label: 'Streak',
         icon: TablerIcons.flame,
         iconColor: ColorTokens.warning,
-        trend: TrendData(
-          direction: TrendDirection.neutral,
-        ),
       ),
-      const StatData(
-        value: '87%',
+      StatData(
+        value: '0%',
         label: 'Completion',
         icon: TablerIcons.chart_pie,
         iconColor: ColorTokens.success,
-        trend: TrendData(
-          direction: TrendDirection.up,
-          value: '+5%',
-          isPositive: true,
-        ),
       ),
     ];
   }
 }
 
-/// Trending workouts list (placeholder)
-class _TrendingWorkoutsList extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // TODO: Load from SetsRepository with sort by popularity
-    final mockWorkouts = [
-      {'name': 'Night Shift Quick Starter', 'duration': '15 min', 'difficulty': 'Beginner'},
-      {'name': 'Midnight Full Body Burn', 'duration': '30 min', 'difficulty': 'Intermediate'},
-      {'name': 'Night Owl HIIT', 'duration': '25 min', 'difficulty': 'Advanced'},
-    ];
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: mockWorkouts.length,
-      itemBuilder: (context, index) {
-        final workout = mockWorkouts[index];
-        return _WorkoutCard(
-          name: workout['name']!,
-          duration: workout['duration']!,
-          difficulty: workout['difficulty']!,
-          onTap: () {
-            // TODO: Navigate to workout details
-          },
-        );
-      },
-    );
-  }
-}
-
-/// Individual workout card
 class _WorkoutCard extends StatelessWidget {
   final String name;
   final String duration;
@@ -220,7 +204,6 @@ class _WorkoutCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Icon
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -236,7 +219,6 @@ class _WorkoutCard extends StatelessWidget {
 
               const SizedBox(width: 16),
 
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +235,7 @@ class _WorkoutCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           TablerIcons.clock,
                           size: 12,
                           color: ColorTokens.textSecondary,
@@ -290,7 +272,6 @@ class _WorkoutCard extends StatelessWidget {
                 ),
               ),
 
-              // Arrow
               const Icon(
                 TablerIcons.chevron_right,
                 color: ColorTokens.textSecondary,

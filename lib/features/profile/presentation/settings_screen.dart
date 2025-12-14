@@ -377,33 +377,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SizedBox(height: 12),
 
-            // Notifications (placeholder)
-            _SettingTile(
-              icon: TablerIcons.bell,
-              title: 'Notifications',
-              subtitle: 'Workout reminders and achievements',
-              trailing: Switch(
-                value: true,
-                activeThumbColor: ColorTokens.accent,
-                onChanged: (value) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Coming soon')),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Units (placeholder)
-            _SettingTile(
-              icon: TablerIcons.ruler,
-              title: 'Units',
-              subtitle: 'Metric',
-              trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.textSecondary),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Coming soon')),
+            // Notifications
+            Consumer(
+              builder: (context, ref, child) {
+                return FutureBuilder<bool?>(
+                  future: ref.read(preferencesRepositoryProvider).getBool('notifications_enabled'),
+                  builder: (context, snapshot) {
+                    final enabled = snapshot.data ?? true;
+                    return _SettingTile(
+                      icon: TablerIcons.bell,
+                      title: 'Notifications',
+                      subtitle: 'Workout reminders',
+                      trailing: Switch(
+                        value: enabled,
+                        activeThumbColor: ColorTokens.accent,
+                        onChanged: (value) async {
+                          await ref.read(preferencesRepositoryProvider).setBool('notifications_enabled', value);
+                        },
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -428,21 +421,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Syncing...')),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Export data (placeholder)
-            _SettingTile(
-              icon: TablerIcons.download,
-              title: 'Export Data',
-              subtitle: 'Download your workout history',
-              trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.textSecondary),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Coming soon')),
                 );
               },
             ),
@@ -540,36 +518,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'Version',
               subtitle: '1.0.0',
               trailing: const SizedBox.shrink(),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Privacy policy (placeholder)
-            _SettingTile(
-              icon: TablerIcons.shield,
-              title: 'Privacy Policy',
-              subtitle: 'How we protect your data',
-              trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.textSecondary),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Coming soon')),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Terms of service (placeholder)
-            _SettingTile(
-              icon: TablerIcons.file_text,
-              title: 'Terms of Service',
-              subtitle: 'User agreement',
-              trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.textSecondary),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Coming soon')),
-                );
-              },
             ),
 
             const SizedBox(height: 40),
