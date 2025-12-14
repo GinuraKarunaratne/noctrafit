@@ -17,6 +17,7 @@ class SignupScreen extends ConsumerStatefulWidget {
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -26,6 +27,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -51,6 +53,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       await userRemote.upsertUserProfile(
         userId: credential.user!.uid,
         email: _emailController.text.trim(),
+        displayName: _nameController.text.trim(),
       );
 
       // Mark as authenticated in preferences for offline mode
@@ -130,6 +133,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
+
+                  // Full Name
+                  TextFormField(
+                    controller: _nameController,
+                    style: GoogleFonts.inter(fontSize: 14, color: ColorTokens.textPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Full Name',
+                      labelStyle: TextStyle(color: ColorTokens.textSecondary),
+                      filled: true,
+                      fillColor: ColorTokens.surface,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: ColorTokens.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: ColorTokens.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: ColorTokens.accent, width: 2)),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Name is required';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
                   // Email
                   TextFormField(

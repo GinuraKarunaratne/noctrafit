@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/auth_provider.dart';
 import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 
@@ -171,6 +173,16 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
 
     if (confirmed != true) return;
 
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to publish'), backgroundColor: ColorTokens.error),
+        );
+      }
+      return;
+    }
+
     // Save locally first
     final workoutSet = await ref.read(setsRepositoryProvider).createCustomSet(
       name: _nameController.text.trim(),
@@ -179,11 +191,29 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
       category: _category.toLowerCase(),
       estimatedMinutes: _estimatedMinutes,
       exercisesJson: jsonEncode(_selectedExercises),
-      authorName: null,
+      authorName: user.email?.split('@').first,
     );
 
-    // Queue for community upload (will sync to Firestore when online)
-    await ref.read(setsRepositoryProvider).queueForCommunityUpload(workoutSet);
+    // Upload to Firestore community_sets
+    try {
+      await FirebaseFirestore.instance.collection('community_sets').doc(workoutSet.uuid).set({
+        'name': workoutSet.name,
+        'description': workoutSet.description,
+        'difficulty': workoutSet.difficulty,
+        'category': workoutSet.category,
+        'estimated_minutes': workoutSet.estimatedMinutes,
+        'exercises': workoutSet.exercises,
+        'author_name': workoutSet.authorName,
+        'author_uid': user.uid,
+        'created_at': FieldValue.serverTimestamp(),
+        'views_count': 0,
+        'downloads_count': 0,
+        'favorites_count': 0,
+      });
+    } catch (e) {
+      // Fallback to sync queue
+      await ref.read(setsRepositoryProvider).queueForCommunityUpload(workoutSet);
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

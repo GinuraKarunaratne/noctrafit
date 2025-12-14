@@ -6,6 +6,7 @@ import 'package:tabler_icons/tabler_icons.dart';
 import '../../../app/providers/auth_provider.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../app/widgets/composite/stats_grid.dart';
+import '../providers/profile_providers.dart';
 import '../widgets/progress_heatmap_card.dart';
 
 /// Profile screen - User stats, heatmap, and settings
@@ -16,9 +17,9 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    // TODO: Load real data from repositories
-    final lifetimeStats = _getLifetimeStats();
-    final heatmapData = _getMockHeatmapData();
+    // Load real data from providers
+    final lifetimeStatsAsync = ref.watch(lifetimeStatsProvider);
+    final heatmapDataAsync = ref.watch(activityHeatmapProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -26,7 +27,7 @@ class ProfileScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(TablerIcons.settings),
-            onPressed: () => context.push('/settings'),
+            onPressed: () => context.push('/profile/settings'),
           ),
         ],
       ),
@@ -87,18 +88,16 @@ class ProfileScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // CW4: Progress Heatmap Card
-            ProgressHeatmapCard(
-              title: 'Workout Activity',
-              completionsByDate: heatmapData,
-              maxIntensity: 3,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tap any day to see details'),
-                  ),
-                );
-              },
+            // Progress Heatmap Card
+            heatmapDataAsync.when(
+              data: (heatmapData) => ProgressHeatmapCard(
+                title: 'Workout Activity',
+                completionsByDate: heatmapData,
+                maxIntensity: 3,
+                onTap: () {},
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
             ),
 
             const SizedBox(height: 16),
@@ -115,10 +114,11 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
 
-            // CW2: Stats Grid
-            StatsGrid(
-              stats: lifetimeStats,
-              crossAxisCount: 2,
+            // Stats Grid
+            lifetimeStatsAsync.when(
+              data: (stats) => StatsGrid(stats: stats, crossAxisCount: 2),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
             ),
 
             const SizedBox(height: 16),
@@ -144,55 +144,6 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  List<StatData> _getLifetimeStats() {
-    // TODO: Load from InsightsRepository
-    return const [
-      StatData(
-        value: '127',
-        label: 'Total Workouts',
-        icon: TablerIcons.barbell,
-        iconColor: ColorTokens.accent,
-      ),
-      StatData(
-        value: '3,450',
-        label: 'Total Minutes',
-        icon: TablerIcons.clock,
-        iconColor: ColorTokens.info,
-      ),
-      StatData(
-        value: '45',
-        label: 'Current Streak',
-        icon: TablerIcons.flame,
-        iconColor: ColorTokens.warning,
-      ),
-      StatData(
-        value: '92%',
-        label: 'Avg Completion',
-        icon: TablerIcons.chart_pie,
-        iconColor: ColorTokens.success,
-      ),
-    ];
-  }
-
-  Map<DateTime, int> _getMockHeatmapData() {
-    // TODO: Load from CompletionLogsDao
-    final data = <DateTime, int>{};
-    final now = DateTime.now();
-
-    // Generate mock data for the past year
-    for (int i = 0; i < 365; i++) {
-      final date = now.subtract(Duration(days: i));
-      final normalized = DateTime(date.year, date.month, date.day);
-
-      // Random workout count (0-3 workouts per day)
-      if (i % 3 == 0) {
-        data[normalized] = (i % 4); // 0, 1, 2, or 3 workouts
-      }
-    }
-
-    return data;
   }
 }
 

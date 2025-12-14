@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,16 +11,8 @@ import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/remote/firestore/user_remote_datasource.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Set Details Screen - View workout set details
-///
-/// Features:
-/// - Workout details (name, description, difficulty, category)
-/// - Exercise list with sets/reps/duration
-/// - "Start Workout" button → launches active session
-/// - "Add to Calendar" button → schedule workout
-/// - Favorite toggle
 class SetDetailsScreen extends ConsumerStatefulWidget {
   final String workoutSetUuid;
 
@@ -55,6 +48,13 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     return int.tryParse(v.toString());
   }
 
+  /// ✅ Convert TimeOfDay to a stable DB-friendly string (24h "HH:mm")
+  String _timeOfDayTo24hString(TimeOfDay t) {
+    final hh = t.hour.toString().padLeft(2, '0');
+    final mm = t.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
   Future<void> _loadWorkoutSet() async {
     final set = await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
     if (set != null && mounted) {
@@ -76,15 +76,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
     final newFavoriteStatus = !_workoutSet!.isFavorite;
 
-    // Update local state immediately
     setState(() {
       _workoutSet = _workoutSet!.copyWith(isFavorite: newFavoriteStatus);
     });
 
-    // Update in database
     await ref.read(setsRepositoryProvider).toggleFavorite(_workoutSet!.id, newFavoriteStatus);
 
-    // Update Firestore favorites if user is authenticated
     final user = ref.read(currentUserProvider);
     if (user != null) {
       final userDataSource = UserRemoteDataSource(FirebaseFirestore.instance);
@@ -103,7 +100,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
   Future<void> _startWorkout() async {
     if (_workoutSet == null) return;
 
-    // Create active session in database
     await ref.read(sessionRepositoryProvider).startSession(
       workoutSetId: _workoutSet!.id,
       workoutSetName: _workoutSet!.name,
@@ -111,35 +107,44 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
       estimatedMinutes: _workoutSet!.estimatedMinutes,
     );
 
-    // Get the created session to get its UUID
     final session = await ref.read(sessionRepositoryProvider).getActiveSession();
     if (session != null && mounted) {
-      // Navigate to active session screen
       context.go('/session/${session.sessionUuid}');
     }
   }
 
   Future<void> _addToCalendar() async {
-    // Show date/time picker dialog
+    if (_workoutSet == null) return;
+
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _AddToCalendarDialog(),
     );
 
-    if (result != null && mounted) {
-      // TODO: Save to schedule_entries table
-      // await ref.read(scheduleRepositoryProvider).scheduleWorkout(
-      //   workoutSetUuid: widget.workoutSetUuid,
-      //   scheduledDate: result['date'],
-      //   timeOfDay: result['time'],
-      // );
+    if (result != null) {
+      final DateTime date = result['date'] as DateTime;
+      final TimeOfDay time = result['time'] as TimeOfDay;
+      final String timeString = _timeOfDayTo24hString(time);
+      final String? note = (result['note'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (result['note'] as String?)?.trim();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Workout scheduled for ${result['date'].toString().split(' ')[0]}'),
-          backgroundColor: ColorTokens.success,
-        ),
+      // ✅ FIX: pass String, not TimeOfDay
+      await ref.read(scheduleRepositoryProvider).scheduleWorkout(
+        workoutSetId: _workoutSet!.id,
+        scheduledDate: date,
+        timeOfDay: timeString, // ✅ was: result['time']
+        note: note,
       );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Workout scheduled for ${date.toString().split(' ')[0]} at $timeString'),
+            backgroundColor: ColorTokens.success,
+          ),
+        );
+      }
     }
   }
 
@@ -147,7 +152,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Show loading state if workout set not loaded yet
     if (_workoutSet == null) {
       return Scaffold(
         backgroundColor: ColorTokens.background,
@@ -164,7 +168,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
       backgroundColor: ColorTokens.background,
       body: CustomScrollView(
         slivers: [
-          // App bar with gradient
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
@@ -176,18 +179,10 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             actions: [
               IconButton(
                 icon: Icon(
-                  _workoutSet!.isFavorite ? TablerIcons.heart_filled : TablerIcons.heart,
-                  color: _workoutSet!.isFavorite ? ColorTokens.error : ColorTokens.textPrimary,
+                  _workoutSet!.isFavorite ? TablerIcons.star_filled : TablerIcons.star,
+                  color: _workoutSet!.isFavorite ? ColorTokens.accent : ColorTokens.textPrimary,
                 ),
                 onPressed: _toggleFavorite,
-              ),
-              IconButton(
-                icon: const Icon(TablerIcons.share, color: ColorTokens.textPrimary),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Share workout')),
-                  );
-                },
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -242,14 +237,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             ),
           ),
 
-          // Content
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Description
                   if (_workoutSet!.description != null) ...[
                     Text(
                       'About',
@@ -269,7 +262,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                     const SizedBox(height: 24),
                   ],
 
-                  // Exercises header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -303,14 +295,13 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // ✅ Exercise list (SAFE)
                   ..._exercises.asMap().entries.map((entry) {
                     final index = entry.key;
                     final exercise = entry.value;
 
                     return _ExerciseCard(
                       number: index + 1,
-                      name: _safeString(exercise['name']), // ✅ fixed (was crashing)
+                      name: _safeString(exercise['name']),
                       sets: _safeInt(exercise['sets']),
                       reps: _safeInt(exercise['reps']),
                       duration: exercise['duration']?.toString(),
@@ -320,7 +311,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                     );
                   }),
 
-                  const SizedBox(height: 100), // Space for bottom buttons
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -328,7 +319,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         ],
       ),
 
-      // Bottom action buttons
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -340,7 +330,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           ),
           child: Row(
             children: [
-              // Add to calendar button
               Expanded(
                 child: OutlinedButton(
                   onPressed: _addToCalendar,
@@ -367,10 +356,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 12),
-
-              // Start workout button
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
@@ -488,7 +474,6 @@ class _ExerciseCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Exercise number
           Container(
             width: 32,
             height: 32,
@@ -510,10 +495,7 @@ class _ExerciseCard extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // Exercise details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,8 +508,6 @@ class _ExerciseCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Sets/Reps/Duration
                 Wrap(
                   spacing: 12,
                   runSpacing: 4,
@@ -554,10 +534,7 @@ class _ExerciseCard extends StatelessWidget {
                       ),
                   ],
                 ),
-
                 const SizedBox(height: 8),
-
-                // Muscle group & equipment
                 Wrap(
                   spacing: 8,
                   children: [
@@ -576,7 +553,6 @@ class _ExerciseCard extends StatelessWidget {
   }
 }
 
-/// Exercise detail widget
 class _ExerciseDetail extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -606,7 +582,6 @@ class _ExerciseDetail extends StatelessWidget {
   }
 }
 
-/// Tag widget
 class _Tag extends StatelessWidget {
   final String label;
   final Color color;
@@ -647,6 +622,13 @@ class _AddToCalendarDialog extends StatefulWidget {
 class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
+  final TextEditingController _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -667,7 +649,6 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Date picker
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Container(
@@ -702,10 +683,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               }
             },
           ),
-
           const SizedBox(height: 8),
-
-          // Time picker
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Container(
@@ -738,6 +716,25 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               }
             },
           ),
+          const SizedBox(height: 12),
+
+          // ✅ Note field (so result['note'] exists)
+          TextField(
+            controller: _noteController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: 'Note (optional)',
+              labelStyle: TextStyle(color: ColorTokens.textSecondary),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: ColorTokens.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: ColorTokens.accent),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
         ],
       ),
       actions: [
@@ -752,7 +749,8 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
           onPressed: () {
             Navigator.pop(context, {
               'date': _selectedDate,
-              'time': _selectedTime,
+              'time': _selectedTime, // keep as TimeOfDay, convert later in _addToCalendar()
+              'note': _noteController.text,
             });
           },
           style: ElevatedButton.styleFrom(

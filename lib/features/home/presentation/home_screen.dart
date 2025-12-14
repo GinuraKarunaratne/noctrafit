@@ -50,12 +50,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('NoctraFit'),
-        actions: [
-          IconButton(
-            icon: const Icon(TablerIcons.bell),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(

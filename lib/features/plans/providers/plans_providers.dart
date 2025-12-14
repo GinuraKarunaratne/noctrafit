@@ -57,38 +57,83 @@ final appSetsProvider = StreamProvider<List<WorkoutSet>>((ref) async* {
   }
 });
 
-/// Community sets (source='community') - filtered and sorted
-final communitySetsProvider = StreamProvider<List<WorkoutSet>>((ref) async* {
-  final repo = ref.watch(setsRepositoryProvider);
+/// Community sets from Firestore - filtered and sorted
+final communitySetsProvider = StreamProvider<List<WorkoutSet>>((ref) {
   final searchQuery = ref.watch(searchQueryProvider);
   final category = ref.watch(selectedCategoryProvider);
   final difficulty = ref.watch(selectedDifficultyProvider);
   final sortBy = ref.watch(sortByProvider);
 
-  // Use filterAndSearch for real-time filtering
-  final sets = await repo.filterAndSearch(
-    query: searchQuery.isEmpty ? null : searchQuery,
-    source: 'community',
-    category: category?.toLowerCase(),
-    difficulty: difficulty?.toLowerCase(),
-    sortBy: sortBy,
-    ascending: false,
-  );
+  return FirebaseFirestore.instance
+      .collection('community_sets')
+      .snapshots()
+      .map((snapshot) {
+    // Convert Firestore docs to WorkoutSet objects
+    var sets = snapshot.docs.map((doc) {
+      final data = doc.data();
+      return WorkoutSet(
+        id: 0, // Firestore sets don't have local id
+        uuid: doc.id,
+        name: data['name'] ?? '',
+        description: data['description'],
+        difficulty: data['difficulty'] ?? 'intermediate',
+        category: data['category'] ?? 'hybrid',
+        source: 'community',
+        estimatedMinutes: data['estimated_minutes'] ?? 30,
+        exercises: data['exercises'] ?? [],
+        authorName: data['author_name'],
+        authorId: data['author_uid'],
+        isFavorite: false, // Will be checked separately via favorites provider
+        createdAt: data['created_at'] != null
+            ? (data['created_at'] as Timestamp).toDate()
+            : DateTime.now(),
+        updatedAt: data['created_at'] != null
+            ? (data['created_at'] as Timestamp).toDate()
+            : DateTime.now(),
+        lastSyncedAt: null,
+      );
+    }).toList();
 
-  yield sets;
+    // Apply filters
+    if (searchQuery.isNotEmpty) {
+      final query = searchQuery.toLowerCase();
+      sets = sets.where((set) =>
+          set.name.toLowerCase().contains(query) ||
+          (set.description?.toLowerCase().contains(query) ?? false)).toList();
+    }
 
-  // Watch for changes and re-filter
-  await for (final _ in repo.watchSetsBySource('community')) {
-    final updatedSets = await repo.filterAndSearch(
-      query: searchQuery.isEmpty ? null : searchQuery,
-      source: 'community',
-      category: category?.toLowerCase(),
-      difficulty: difficulty?.toLowerCase(),
-      sortBy: sortBy,
-      ascending: false,
-    );
-    yield updatedSets;
-  }
+    if (category != null) {
+      sets = sets.where((set) => set.category.toLowerCase() == category.toLowerCase()).toList();
+    }
+
+    if (difficulty != null) {
+      sets = sets.where((set) => set.difficulty.toLowerCase() == difficulty.toLowerCase()).toList();
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'recent':
+        sets.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case 'popular':
+        // For now, sort by creation date (can add popularity metrics later)
+        sets.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case 'difficulty':
+        final difficultyOrder = {'beginner': 1, 'intermediate': 2, 'advanced': 3};
+        sets.sort((a, b) {
+          final aOrder = difficultyOrder[a.difficulty.toLowerCase()] ?? 2;
+          final bOrder = difficultyOrder[b.difficulty.toLowerCase()] ?? 2;
+          return aOrder.compareTo(bOrder);
+        });
+        break;
+      case 'duration':
+        sets.sort((a, b) => a.estimatedMinutes.compareTo(b.estimatedMinutes));
+        break;
+    }
+
+    return sets;
+  });
 });
 
 /// All sets (no source filter) - filtered and sorted
