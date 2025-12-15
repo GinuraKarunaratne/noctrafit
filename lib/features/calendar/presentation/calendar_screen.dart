@@ -58,16 +58,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calendar'),
-        actions: [
-          IconButton(
-            icon: const Icon(TablerIcons.calendar_plus),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Schedule workout')),
-              );
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
