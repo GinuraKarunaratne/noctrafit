@@ -52,8 +52,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const Text('NoctraFit'),
       ),
-      body: SingleChildScrollView(
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() => _isLoading = true);
+          await _loadData();
+          ref.invalidate(weeklyStatsProvider);
+        },
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (_showBanner)
@@ -142,6 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 24),
           ],
         ),
+      ),
       ),
     );
   }

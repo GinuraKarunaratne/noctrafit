@@ -120,6 +120,7 @@ final weeklyChartDataProvider = FutureProvider<List<ChartDataPoint>>((ref) async
 /// Provider for monthly chart data (last 4 weeks in minutes)
 final monthlyChartDataProvider = FutureProvider<List<ChartDataPoint>>((ref) async {
   final insightsRepo = ref.read(insightsRepositoryProvider);
+  final user = ref.watch(currentUserProvider);
   final now = DateTime.now();
 
   final weeks = <ChartDataPoint>[];
@@ -127,10 +128,23 @@ final monthlyChartDataProvider = FutureProvider<List<ChartDataPoint>>((ref) asyn
     final weekEnd = now.subtract(Duration(days: i * 7));
     final weekStart = weekEnd.subtract(const Duration(days: 7));
 
-    final logs = await insightsRepo.getLogsInRange(weekStart, weekEnd);
-    final totalMinutes = logs.fold<int>(0, (sum, log) => sum + (log.durationSeconds ~/ 60));
-
-    weeks.add(ChartDataPoint(value: totalMinutes.toDouble(), label: 'W${4 - i}'));
+    if (user != null) {
+      final docs = await insightsRepo.getLogsInRangeRemote(user.uid, weekStart, weekEnd);
+      int totalMinutes = 0;
+      for (final d in docs) {
+        final ds = d['duration_seconds'];
+        if (ds is int) {
+          totalMinutes += ds ~/ 60;
+        } else if (ds is String) {
+          totalMinutes += (int.tryParse(ds) ?? 0) ~/ 60;
+        }
+      }
+      weeks.add(ChartDataPoint(value: totalMinutes.toDouble(), label: 'W${4 - i}'));
+    } else {
+      final logs = await insightsRepo.getLogsInRange(weekStart, weekEnd);
+      final totalMinutes = logs.fold<int>(0, (sum, log) => sum + (log.durationSeconds ~/ 60));
+      weeks.add(ChartDataPoint(value: totalMinutes.toDouble(), label: 'W${4 - i}'));
+    }
   }
 
   return weeks;
@@ -139,21 +153,49 @@ final monthlyChartDataProvider = FutureProvider<List<ChartDataPoint>>((ref) asyn
 /// Provider for category breakdown
 final categoryBreakdownProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final insightsRepo = ref.read(insightsRepositoryProvider);
-  final setsRepo = ref.read(setsRepositoryProvider);
+  final user = ref.watch(currentUserProvider);
   final now = DateTime.now();
   final startOfMonth = DateTime(now.year, now.month, 1);
 
-  final logs = await insightsRepo.getLogsInRange(startOfMonth, now);
+  if (user != null) {
+    final docs = await insightsRepo.getLogsInRangeRemote(user.uid, startOfMonth, now);
+    if (docs.isEmpty) return [];
 
-  if (logs.isEmpty) {
-    return [];
+    final categoryCounts = <String, int>{};
+    for (final d in docs) {
+      try {
+        final workoutSet = d['workout_set'];
+        if (workoutSet is Map) {
+          final category = workoutSet['category']?.toString() ?? 'other';
+          categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+        }
+      } catch (_) {}
+    }
+
+    final totalWorkouts = docs.length;
+    final breakdown = <Map<String, dynamic>>[];
+    categoryCounts.forEach((category, count) {
+      final percentage = ((count / totalWorkouts) * 100).round();
+      breakdown.add({
+        'name': category[0].toUpperCase() + category.substring(1),
+        'workouts': count,
+        'percentage': percentage,
+        'icon': _getCategoryIcon(category),
+      });
+    });
+
+    breakdown.sort((a, b) => (b['workouts'] as int).compareTo(a['workouts'] as int));
+    return breakdown;
   }
 
-  // Get all sets to determine categories
+  // Fallback to local
+  final logs = await insightsRepo.getLogsInRange(startOfMonth, now);
+  if (logs.isEmpty) return [];
+
+  final setsRepo = ref.read(setsRepositoryProvider);
   final allSets = await setsRepo.getAllSets();
   final setsById = {for (var set in allSets) set.id: set};
 
-  // Count workouts by category
   final categoryCounts = <String, int>{};
   for (final log in logs) {
     if (log.workoutSetId != null) {
@@ -165,8 +207,6 @@ final categoryBreakdownProvider = FutureProvider<List<Map<String, dynamic>>>((re
   }
 
   final totalWorkouts = logs.length;
-
-  // Build category breakdown
   final breakdown = <Map<String, dynamic>>[];
   categoryCounts.forEach((category, count) {
     final percentage = ((count / totalWorkouts) * 100).round();
@@ -178,9 +218,7 @@ final categoryBreakdownProvider = FutureProvider<List<Map<String, dynamic>>>((re
     });
   });
 
-  // Sort by count descending
   breakdown.sort((a, b) => (b['workouts'] as int).compareTo(a['workouts'] as int));
-
   return breakdown;
 });
 
