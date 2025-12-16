@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'theme/app_theme.dart';
-import 'theme/accessibility_palettes.dart';
 import 'router/app_router.dart';
 import 'providers/service_providers.dart';
 import 'providers/repository_providers.dart';

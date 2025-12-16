@@ -88,8 +88,9 @@ class InsightsRepository {
     int totalSeconds = 0;
     for (final d in docs) {
       final ds = d['duration_seconds'];
-      if (ds is int) totalSeconds += ds;
-      else if (ds is String) totalSeconds += int.tryParse(ds) ?? 0;
+      if (ds is int) {
+        totalSeconds += ds;
+      } else if (ds is String) totalSeconds += int.tryParse(ds) ?? 0;
     }
     return (totalSeconds / 60).round();
   }
@@ -110,8 +111,9 @@ class InsightsRepository {
     int totalSeconds = 0;
     for (final d in docs) {
       final ds = d['duration_seconds'];
-      if (ds is int) totalSeconds += ds;
-      else if (ds is String) totalSeconds += int.tryParse(ds) ?? 0;
+      if (ds is int) {
+        totalSeconds += ds;
+      } else if (ds is String) totalSeconds += int.tryParse(ds) ?? 0;
     }
     return (totalSeconds / 60).round();
   }
