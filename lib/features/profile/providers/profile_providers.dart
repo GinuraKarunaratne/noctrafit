@@ -20,6 +20,23 @@ final totalWorkoutsProvider = FutureProvider<int>((ref) async {
 
 /// Provider for total minutes (lifetime)
 final totalMinutesProvider = FutureProvider<int>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user != null) {
+    // Use Firebase completion logs
+    final docs = await ref.read(userRemoteDataSourceProvider).fetchCompletionLogs(userId: user.uid);
+    int totalSeconds = 0;
+    for (final d in docs) {
+      final ds = d['duration_seconds'];
+      if (ds is int) {
+        totalSeconds += ds;
+      } else if (ds is String) {
+        totalSeconds += int.tryParse(ds) ?? 0;
+      }
+    }
+    return (totalSeconds / 60).round();
+  }
+
+  // Fallback to local
   final logs = await ref.read(insightsRepositoryProvider).getAllLogs();
   return logs.fold<int>(0, (sum, log) => sum + (log.durationSeconds ~/ 60));
 });
