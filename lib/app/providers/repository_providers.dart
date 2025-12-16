@@ -39,14 +39,18 @@ final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
     db.completionLogsDao,
     userRemote: userRemote,
     auth: auth,
+    workoutSetsDao: db.workoutSetsDao,
+    setsRemote: ref.watch(setsRemoteDataSourceProvider),
   );
 });
 
 /// Provider for InsightsRepository - handles analytics and statistics
 final insightsRepositoryProvider = Provider<InsightsRepository>((ref) {
   final db = ref.watch(databaseProvider);
+  final userRemote = ref.watch(userRemoteDataSourceProvider);
   return InsightsRepository(
     db.completionLogsDao,
+    remote: userRemote,
   );
 });
 

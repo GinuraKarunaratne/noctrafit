@@ -170,6 +170,47 @@ class UserRemoteDataSource {
     }
   }
 
+  /// Fetch completion logs for a user.
+  /// If `start`/`end` provided, client-side filtering will be applied
+  /// (completion timestamps are stored as ISO strings in documents).
+  Future<List<Map<String, dynamic>>> fetchCompletionLogs({
+    required String userId,
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('completion_logs')
+          .get();
+
+      final docs = snapshot.docs.map((d) => {
+            'id': d.id,
+            ...d.data(),
+          }).toList();
+
+      if (start == null && end == null) return docs;
+
+      // Client-side filter by parsing ISO timestamps (if present)
+      return docs.where((doc) {
+        final completedAtRaw = doc['completed_at'];
+        if (completedAtRaw == null) return false;
+        try {
+          final dt = DateTime.parse(completedAtRaw.toString());
+          if (start != null && dt.isBefore(start)) return false;
+          if (end != null && dt.isAfter(end)) return false;
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+    } catch (e) {
+      _logger.e('Failed to fetch completion logs', error: e);
+      return [];
+    }
+  }
+
   // ========== Achievements Operations ==========
 
   /// Unlock an achievement for a user

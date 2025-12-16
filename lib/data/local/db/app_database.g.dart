@@ -2873,6 +2873,17 @@ class $ActiveSessionsTable extends ActiveSessions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _workoutSetUuidMeta = const VerificationMeta(
+    'workoutSetUuid',
+  );
+  @override
+  late final GeneratedColumn<String> workoutSetUuid = GeneratedColumn<String>(
+    'workout_set_uuid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _startedAtMeta = const VerificationMeta(
     'startedAt',
   );
@@ -2959,6 +2970,7 @@ class $ActiveSessionsTable extends ActiveSessions
     sessionUuid,
     workoutSetId,
     workoutSetName,
+    workoutSetUuid,
     startedAt,
     currentExerciseIndex,
     totalExercises,
@@ -3014,6 +3026,15 @@ class $ActiveSessionsTable extends ActiveSessions
       );
     } else if (isInserting) {
       context.missing(_workoutSetNameMeta);
+    }
+    if (data.containsKey('workout_set_uuid')) {
+      context.handle(
+        _workoutSetUuidMeta,
+        workoutSetUuid.isAcceptableOrUnknown(
+          data['workout_set_uuid']!,
+          _workoutSetUuidMeta,
+        ),
+      );
     }
     if (data.containsKey('started_at')) {
       context.handle(
@@ -3111,6 +3132,10 @@ class $ActiveSessionsTable extends ActiveSessions
         DriftSqlType.string,
         data['${effectivePrefix}workout_set_name'],
       )!,
+      workoutSetUuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workout_set_uuid'],
+      ),
       startedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}started_at'],
@@ -3159,6 +3184,9 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
   /// Workout set name (cached for display)
   final String workoutSetName;
 
+  /// Optional workout set UUID (for mapping to Firestore documents)
+  final String? workoutSetUuid;
+
   /// When the session started
   final DateTime startedAt;
 
@@ -3184,6 +3212,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
     required this.sessionUuid,
     required this.workoutSetId,
     required this.workoutSetName,
+    this.workoutSetUuid,
     required this.startedAt,
     required this.currentExerciseIndex,
     required this.totalExercises,
@@ -3199,6 +3228,9 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
     map['session_uuid'] = Variable<String>(sessionUuid);
     map['workout_set_id'] = Variable<int>(workoutSetId);
     map['workout_set_name'] = Variable<String>(workoutSetName);
+    if (!nullToAbsent || workoutSetUuid != null) {
+      map['workout_set_uuid'] = Variable<String>(workoutSetUuid);
+    }
     map['started_at'] = Variable<DateTime>(startedAt);
     map['current_exercise_index'] = Variable<int>(currentExerciseIndex);
     map['total_exercises'] = Variable<int>(totalExercises);
@@ -3215,6 +3247,9 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
       sessionUuid: Value(sessionUuid),
       workoutSetId: Value(workoutSetId),
       workoutSetName: Value(workoutSetName),
+      workoutSetUuid: workoutSetUuid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workoutSetUuid),
       startedAt: Value(startedAt),
       currentExerciseIndex: Value(currentExerciseIndex),
       totalExercises: Value(totalExercises),
@@ -3235,6 +3270,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
       sessionUuid: serializer.fromJson<String>(json['sessionUuid']),
       workoutSetId: serializer.fromJson<int>(json['workoutSetId']),
       workoutSetName: serializer.fromJson<String>(json['workoutSetName']),
+      workoutSetUuid: serializer.fromJson<String?>(json['workoutSetUuid']),
       startedAt: serializer.fromJson<DateTime>(json['startedAt']),
       currentExerciseIndex: serializer.fromJson<int>(
         json['currentExerciseIndex'],
@@ -3256,6 +3292,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
       'sessionUuid': serializer.toJson<String>(sessionUuid),
       'workoutSetId': serializer.toJson<int>(workoutSetId),
       'workoutSetName': serializer.toJson<String>(workoutSetName),
+      'workoutSetUuid': serializer.toJson<String?>(workoutSetUuid),
       'startedAt': serializer.toJson<DateTime>(startedAt),
       'currentExerciseIndex': serializer.toJson<int>(currentExerciseIndex),
       'totalExercises': serializer.toJson<int>(totalExercises),
@@ -3271,6 +3308,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
     String? sessionUuid,
     int? workoutSetId,
     String? workoutSetName,
+    Value<String?> workoutSetUuid = const Value.absent(),
     DateTime? startedAt,
     int? currentExerciseIndex,
     int? totalExercises,
@@ -3283,6 +3321,9 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
     sessionUuid: sessionUuid ?? this.sessionUuid,
     workoutSetId: workoutSetId ?? this.workoutSetId,
     workoutSetName: workoutSetName ?? this.workoutSetName,
+    workoutSetUuid: workoutSetUuid.present
+        ? workoutSetUuid.value
+        : this.workoutSetUuid,
     startedAt: startedAt ?? this.startedAt,
     currentExerciseIndex: currentExerciseIndex ?? this.currentExerciseIndex,
     totalExercises: totalExercises ?? this.totalExercises,
@@ -3303,6 +3344,9 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
       workoutSetName: data.workoutSetName.present
           ? data.workoutSetName.value
           : this.workoutSetName,
+      workoutSetUuid: data.workoutSetUuid.present
+          ? data.workoutSetUuid.value
+          : this.workoutSetUuid,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
       currentExerciseIndex: data.currentExerciseIndex.present
           ? data.currentExerciseIndex.value
@@ -3330,6 +3374,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
           ..write('sessionUuid: $sessionUuid, ')
           ..write('workoutSetId: $workoutSetId, ')
           ..write('workoutSetName: $workoutSetName, ')
+          ..write('workoutSetUuid: $workoutSetUuid, ')
           ..write('startedAt: $startedAt, ')
           ..write('currentExerciseIndex: $currentExerciseIndex, ')
           ..write('totalExercises: $totalExercises, ')
@@ -3347,6 +3392,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
     sessionUuid,
     workoutSetId,
     workoutSetName,
+    workoutSetUuid,
     startedAt,
     currentExerciseIndex,
     totalExercises,
@@ -3363,6 +3409,7 @@ class ActiveSession extends DataClass implements Insertable<ActiveSession> {
           other.sessionUuid == this.sessionUuid &&
           other.workoutSetId == this.workoutSetId &&
           other.workoutSetName == this.workoutSetName &&
+          other.workoutSetUuid == this.workoutSetUuid &&
           other.startedAt == this.startedAt &&
           other.currentExerciseIndex == this.currentExerciseIndex &&
           other.totalExercises == this.totalExercises &&
@@ -3377,6 +3424,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
   final Value<String> sessionUuid;
   final Value<int> workoutSetId;
   final Value<String> workoutSetName;
+  final Value<String?> workoutSetUuid;
   final Value<DateTime> startedAt;
   final Value<int> currentExerciseIndex;
   final Value<int> totalExercises;
@@ -3389,6 +3437,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
     this.sessionUuid = const Value.absent(),
     this.workoutSetId = const Value.absent(),
     this.workoutSetName = const Value.absent(),
+    this.workoutSetUuid = const Value.absent(),
     this.startedAt = const Value.absent(),
     this.currentExerciseIndex = const Value.absent(),
     this.totalExercises = const Value.absent(),
@@ -3402,6 +3451,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
     required String sessionUuid,
     required int workoutSetId,
     required String workoutSetName,
+    this.workoutSetUuid = const Value.absent(),
     required DateTime startedAt,
     required int currentExerciseIndex,
     required int totalExercises,
@@ -3424,6 +3474,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
     Expression<String>? sessionUuid,
     Expression<int>? workoutSetId,
     Expression<String>? workoutSetName,
+    Expression<String>? workoutSetUuid,
     Expression<DateTime>? startedAt,
     Expression<int>? currentExerciseIndex,
     Expression<int>? totalExercises,
@@ -3437,6 +3488,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
       if (sessionUuid != null) 'session_uuid': sessionUuid,
       if (workoutSetId != null) 'workout_set_id': workoutSetId,
       if (workoutSetName != null) 'workout_set_name': workoutSetName,
+      if (workoutSetUuid != null) 'workout_set_uuid': workoutSetUuid,
       if (startedAt != null) 'started_at': startedAt,
       if (currentExerciseIndex != null)
         'current_exercise_index': currentExerciseIndex,
@@ -3453,6 +3505,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
     Value<String>? sessionUuid,
     Value<int>? workoutSetId,
     Value<String>? workoutSetName,
+    Value<String?>? workoutSetUuid,
     Value<DateTime>? startedAt,
     Value<int>? currentExerciseIndex,
     Value<int>? totalExercises,
@@ -3466,6 +3519,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
       sessionUuid: sessionUuid ?? this.sessionUuid,
       workoutSetId: workoutSetId ?? this.workoutSetId,
       workoutSetName: workoutSetName ?? this.workoutSetName,
+      workoutSetUuid: workoutSetUuid ?? this.workoutSetUuid,
       startedAt: startedAt ?? this.startedAt,
       currentExerciseIndex: currentExerciseIndex ?? this.currentExerciseIndex,
       totalExercises: totalExercises ?? this.totalExercises,
@@ -3490,6 +3544,9 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
     }
     if (workoutSetName.present) {
       map['workout_set_name'] = Variable<String>(workoutSetName.value);
+    }
+    if (workoutSetUuid.present) {
+      map['workout_set_uuid'] = Variable<String>(workoutSetUuid.value);
     }
     if (startedAt.present) {
       map['started_at'] = Variable<DateTime>(startedAt.value);
@@ -3522,6 +3579,7 @@ class ActiveSessionsCompanion extends UpdateCompanion<ActiveSession> {
           ..write('sessionUuid: $sessionUuid, ')
           ..write('workoutSetId: $workoutSetId, ')
           ..write('workoutSetName: $workoutSetName, ')
+          ..write('workoutSetUuid: $workoutSetUuid, ')
           ..write('startedAt: $startedAt, ')
           ..write('currentExerciseIndex: $currentExerciseIndex, ')
           ..write('totalExercises: $totalExercises, ')
@@ -6242,6 +6300,7 @@ typedef $$ActiveSessionsTableCreateCompanionBuilder =
       required String sessionUuid,
       required int workoutSetId,
       required String workoutSetName,
+      Value<String?> workoutSetUuid,
       required DateTime startedAt,
       required int currentExerciseIndex,
       required int totalExercises,
@@ -6256,6 +6315,7 @@ typedef $$ActiveSessionsTableUpdateCompanionBuilder =
       Value<String> sessionUuid,
       Value<int> workoutSetId,
       Value<String> workoutSetName,
+      Value<String?> workoutSetUuid,
       Value<DateTime> startedAt,
       Value<int> currentExerciseIndex,
       Value<int> totalExercises,
@@ -6314,6 +6374,11 @@ class $$ActiveSessionsTableFilterComposer
 
   ColumnFilters<String> get workoutSetName => $composableBuilder(
     column: $table.workoutSetName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workoutSetUuid => $composableBuilder(
+    column: $table.workoutSetUuid,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6400,6 +6465,11 @@ class $$ActiveSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get workoutSetUuid => $composableBuilder(
+    column: $table.workoutSetUuid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get startedAt => $composableBuilder(
     column: $table.startedAt,
     builder: (column) => ColumnOrderings(column),
@@ -6478,6 +6548,11 @@ class $$ActiveSessionsTableAnnotationComposer
 
   GeneratedColumn<String> get workoutSetName => $composableBuilder(
     column: $table.workoutSetName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get workoutSetUuid => $composableBuilder(
+    column: $table.workoutSetUuid,
     builder: (column) => column,
   );
 
@@ -6570,6 +6645,7 @@ class $$ActiveSessionsTableTableManager
                 Value<String> sessionUuid = const Value.absent(),
                 Value<int> workoutSetId = const Value.absent(),
                 Value<String> workoutSetName = const Value.absent(),
+                Value<String?> workoutSetUuid = const Value.absent(),
                 Value<DateTime> startedAt = const Value.absent(),
                 Value<int> currentExerciseIndex = const Value.absent(),
                 Value<int> totalExercises = const Value.absent(),
@@ -6582,6 +6658,7 @@ class $$ActiveSessionsTableTableManager
                 sessionUuid: sessionUuid,
                 workoutSetId: workoutSetId,
                 workoutSetName: workoutSetName,
+                workoutSetUuid: workoutSetUuid,
                 startedAt: startedAt,
                 currentExerciseIndex: currentExerciseIndex,
                 totalExercises: totalExercises,
@@ -6596,6 +6673,7 @@ class $$ActiveSessionsTableTableManager
                 required String sessionUuid,
                 required int workoutSetId,
                 required String workoutSetName,
+                Value<String?> workoutSetUuid = const Value.absent(),
                 required DateTime startedAt,
                 required int currentExerciseIndex,
                 required int totalExercises,
@@ -6608,6 +6686,7 @@ class $$ActiveSessionsTableTableManager
                 sessionUuid: sessionUuid,
                 workoutSetId: workoutSetId,
                 workoutSetName: workoutSetName,
+                workoutSetUuid: workoutSetUuid,
                 startedAt: startedAt,
                 currentExerciseIndex: currentExerciseIndex,
                 totalExercises: totalExercises,

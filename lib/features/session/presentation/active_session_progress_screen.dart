@@ -78,17 +78,29 @@ class _ActiveSessionProgressScreenState
     if (session != null && mounted) {
       // Get all sets and find by ID
       final allSets = await ref.read(setsRepositoryProvider).getAllSets();
-      final workoutSet =
-          allSets.firstWhere((set) => set.id == session.workoutSetId);
+
+      // Try to find by numeric id first; avoid throwing if not present.
+      final matching = allSets.where((set) => set.id == session.workoutSetId).toList();
+      WorkoutSet? workoutSet = matching.isNotEmpty ? matching.first : null;
+
+      // If not found by id, try to find by UUID (if session stores it)
+      if (workoutSet == null && session.workoutSetUuid != null) {
+        workoutSet = await ref.read(setsRepositoryProvider).getSetByUuid(session.workoutSetUuid!);
+      }
+
+      // If still not found, fallback to first available set to avoid crash (UI will treat as loading)
+      if (workoutSet == null && allSets.isNotEmpty) {
+        workoutSet = allSets.first;
+      }
 
       setState(() {
         _session = session;
         _workoutSet = workoutSet;
         _elapsed = DateTime.now().difference(session.startedAt);
 
-        // Parse exercises JSON
+        // Parse exercises JSON defensively
         try {
-          final exercisesJson = jsonDecode(workoutSet.exercises) as List<dynamic>;
+          final exercisesJson = jsonDecode(_workoutSet?.exercises ?? '[]') as List<dynamic>;
           _exercises = exercisesJson.cast<Map<String, dynamic>>();
         } catch (e) {
           _exercises = [];
@@ -239,45 +251,59 @@ class _ActiveSessionProgressScreenState
         backgroundColor: ColorTokens.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(TablerIcons.x, color: ColorTokens.textSecondary),
-          onPressed: () async {
-            // Show confirmation dialog
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                backgroundColor: ColorTokens.surface,
-                title: const Text(
-                  'End Workout?',
-                  style: TextStyle(color: ColorTokens.textPrimary),
-                ),
-                content: const Text(
-                  'Are you sure you want to end this workout? Progress will be saved.',
-                  style: TextStyle(color: ColorTokens.textSecondary),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('End', style: TextStyle(color: ColorTokens.error)),
-                  ),
-                ],
-              ),
-            );
-
-            if (confirmed == true && mounted) {
-              _timer?.cancel();
-              await ref.read(sessionRepositoryProvider).completeSession();
-
-              // ✅ GoRouter-safe: go home instead of popping last page
-              if (mounted) {
-                context.go('/'); // change to '/home' if your home route is different
-              }
+          icon: const Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
+          onPressed: () {
+            // Avoid popping the last page (which causes GoRouter assertion).
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // If there's no page to pop, navigate to home explicitly.
+              context.go('/home');
             }
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(TablerIcons.x, color: ColorTokens.textSecondary),
+            onPressed: () async {
+              // Show confirmation dialog
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: ColorTokens.surface,
+                  title: const Text(
+                    'End Workout?',
+                    style: TextStyle(color: ColorTokens.textPrimary),
+                  ),
+                  content: const Text(
+                    'Are you sure you want to end this workout? Progress will be saved.',
+                    style: TextStyle(color: ColorTokens.textSecondary),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('End', style: TextStyle(color: ColorTokens.error)),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true && mounted) {
+                _timer?.cancel();
+                await ref.read(sessionRepositoryProvider).completeSession();
+
+                // ✅ GoRouter-safe: go home instead of popping last page
+                if (mounted) {
+                  context.go('/home');
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(

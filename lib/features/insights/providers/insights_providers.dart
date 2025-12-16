@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noctrafit/app/providers/repository_providers.dart';
+import '../../../data/local/db/app_database.dart';
+import '../../../app/providers/auth_provider.dart';
 import 'package:noctrafit/app/widgets/composite/luminous_chart_card.dart';
 import 'package:noctrafit/app/widgets/composite/stats_grid.dart';
 import 'package:tabler_icons/tabler_icons.dart';
@@ -8,17 +10,30 @@ import '../../../app/theme/color_tokens.dart';
 
 /// Provider for monthly workout count
 final monthlyWorkoutsProvider = FutureProvider<int>((ref) async {
-  return ref.read(insightsRepositoryProvider).getWorkoutsThisMonth();
+  final user = ref.watch(currentUserProvider);
+  final repo = ref.read(insightsRepositoryProvider);
+  if (user != null) {
+    return repo.getWorkoutsThisMonthRemote(user.uid);
+  }
+  return repo.getWorkoutsThisMonth();
 });
 
 /// Provider for monthly total minutes
 final monthlyMinutesProvider = FutureProvider<int>((ref) async {
-  return ref.read(insightsRepositoryProvider).getTotalMinutesThisMonth();
+  final user = ref.watch(currentUserProvider);
+  final repo = ref.read(insightsRepositoryProvider);
+  if (user != null) {
+    return repo.getTotalMinutesThisMonthRemote(user.uid);
+  }
+  return repo.getTotalMinutesThisMonth();
 });
 
 /// Provider for current streak
 final currentStreakProvider = FutureProvider<int>((ref) async {
-  return ref.read(insightsRepositoryProvider).getCurrentStreak();
+  final user = ref.watch(currentUserProvider);
+  final repo = ref.read(insightsRepositoryProvider);
+  if (user != null) return repo.getCurrentStreakRemote(user.uid);
+  return repo.getCurrentStreak();
 });
 
 /// Provider for completion rate this month
@@ -27,6 +42,30 @@ final completionRateProvider = FutureProvider<double>((ref) async {
   final now = DateTime.now();
   final startOfMonth = DateTime(now.year, now.month, 1);
   final endOfMonth = DateTime(now.year, now.month + 1, 1);
+  final user = ref.watch(currentUserProvider);
+  final insightsRepo = ref.read(insightsRepositoryProvider);
+
+  if (user != null) {
+    // Compute from remote completion logs using per-exercise flags
+    final docs = await insightsRepo.getLogsInRangeRemote(user.uid, startOfMonth, endOfMonth);
+    int totalDone = 0;
+    int totalExercises = 0;
+    for (final d in docs) {
+      try {
+        final ex = d['exercises_completed'];
+        if (ex is List) {
+          for (final e in ex) {
+            if (e is Map) {
+              if (e['done'] == true) totalDone++;
+              totalExercises++;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    if (totalExercises == 0) return 0.0;
+    return (totalDone / totalExercises) * 100.0;
+  }
 
   final scheduled = await scheduleRepo.getEntriesInRange(startOfMonth, endOfMonth);
   if (scheduled.isEmpty) return 0.0;
@@ -37,11 +76,28 @@ final completionRateProvider = FutureProvider<double>((ref) async {
 
 /// Provider for weekly chart data (last 7 days)
 final weeklyChartDataProvider = FutureProvider<List<ChartDataPoint>>((ref) async {
-  final insightsRepo = ref.read(insightsRepositoryProvider);
   final now = DateTime.now();
   final startOfWeek = now.subtract(Duration(days: 6));
-
-  final logs = await insightsRepo.getLogsInRange(startOfWeek, now);
+  final user = ref.watch(currentUserProvider);
+  final repo = ref.read(insightsRepositoryProvider);
+  final logs = user != null
+      ? (await repo.getLogsInRangeRemote(user.uid, startOfWeek, now)).map((d) {
+          final completedAt = DateTime.tryParse(d['completed_at']?.toString() ?? '') ?? DateTime.now();
+          final startedAt = DateTime.tryParse(d['started_at']?.toString() ?? '') ?? completedAt.subtract(Duration(seconds: d['duration_seconds'] is int ? d['duration_seconds'] as int : int.tryParse(d['duration_seconds']?.toString() ?? '0') ?? 0));
+          final createdAt = DateTime.tryParse(d['created_at']?.toString() ?? '') ?? completedAt;
+          return CompletionLog(
+            id: 0,
+            uuid: d['uuid']?.toString() ?? '',
+            workoutSetId: d['workout_set_id'] is int ? d['workout_set_id'] as int : null,
+            startedAt: startedAt,
+            completedAt: completedAt,
+            durationSeconds: d['duration_seconds'] is int ? d['duration_seconds'] as int : int.tryParse(d['duration_seconds']?.toString() ?? '0') ?? 0,
+            exercisesCompleted: d['exercises_completed'] is String ? d['exercises_completed'] as String : (d['exercises_completed'] is List ? d['exercises_completed'].toString() : ''),
+            notes: null,
+            createdAt: createdAt,
+          );
+        }).toList()
+      : await repo.getLogsInRange(startOfWeek, now);
 
   // Group by day
   final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

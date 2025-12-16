@@ -1,19 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:noctrafit/app/providers/repository_providers.dart';
+import '../../../app/providers/auth_provider.dart';
 import 'package:noctrafit/app/widgets/composite/stats_grid.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 import '../../../app/theme/color_tokens.dart';
 
 final weeklyWorkoutsProvider = FutureProvider<int>((ref) async {
-  return ref.read(insightsRepositoryProvider).getWorkoutsThisWeek();
+  final user = ref.watch(currentUserProvider);
+  final insights = ref.read(insightsRepositoryProvider);
+  if (user != null) {
+    return insights.getWorkoutsThisWeekRemote(user.uid);
+  }
+  return insights.getWorkoutsThisWeek();
 });
 
 final weeklyMinutesProvider = FutureProvider<int>((ref) async {
-  return ref.read(insightsRepositoryProvider).getTotalMinutesThisWeek();
+  final user = ref.watch(currentUserProvider);
+  final insights = ref.read(insightsRepositoryProvider);
+  if (user != null) {
+    return insights.getTotalMinutesThisWeekRemote(user.uid);
+  }
+  return insights.getTotalMinutesThisWeek();
 });
 
 final weeklyStreakProvider = FutureProvider<int>((ref) async {
-  return ref.read(insightsRepositoryProvider).getCurrentStreak();
+  final user = ref.watch(currentUserProvider);
+  final insights = ref.read(insightsRepositoryProvider);
+  if (user != null) {
+    return insights.getCurrentStreakRemote(user.uid);
+  }
+  return insights.getCurrentStreak();
 });
 
 final weeklyCompletionProvider = FutureProvider<double>((ref) async {

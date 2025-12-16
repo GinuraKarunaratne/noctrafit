@@ -141,6 +141,9 @@ class ActiveSessions extends Table {
 
   /// Workout set name (cached for display)
   TextColumn get workoutSetName => text()();
+  
+  /// Optional workout set UUID (for mapping to Firestore documents)
+  TextColumn get workoutSetUuid => text().nullable()();
 
   /// When the session started
   DateTimeColumn get startedAt => dateTime()();

@@ -241,6 +241,28 @@ class SetsRemoteDataSource {
     );
   }
 
+  /// Fetch a single community set by its UUID field
+  Future<Map<String, dynamic>?> fetchCommunitySetByUuid({
+    required String uuid,
+  }) async {
+    return _client.executeOperation(
+      operation: () async {
+        final snapshot = await _client.communitySets
+            .where('uuid', isEqualTo: uuid)
+            .limit(1)
+            .get();
+
+        if (snapshot.docs.isEmpty) return null;
+        final doc = snapshot.docs.first;
+        return {
+          ...doc.data(),
+          'firestore_id': doc.id,
+        };
+      },
+      operationName: 'fetchCommunitySetByUuid',
+    );
+  }
+
   /// Batch upload multiple sets
   /// Useful for initial catalog population
   Future<void> batchUploadCatalogSets({

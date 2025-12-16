@@ -11,6 +11,7 @@ import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/remote/firestore/user_remote_datasource.dart';
+import '../../../app/providers/service_providers.dart';
 
 /// Set Details Screen - View workout set details
 class SetDetailsScreen extends ConsumerStatefulWidget {
@@ -56,17 +57,92 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
   }
 
   Future<void> _loadWorkoutSet() async {
-    final set = await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
+    // Try local DB first
+    var set = await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
+
+    // If not found locally, try remote by uuid field
+    if (set == null) {
+      try {
+        final setsRemote = ref.read(setsRemoteDataSourceProvider);
+        final remote = await setsRemote.fetchCommunitySetByUuid(uuid: widget.workoutSetUuid);
+        if (remote != null) {
+          final exercisesRaw = remote['exercises'];
+          final exercisesStr = exercisesRaw is String ? exercisesRaw : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
+          set = WorkoutSet(
+            id: 0,
+            uuid: widget.workoutSetUuid,
+            name: remote['name'] ?? '',
+            description: remote['description'],
+            difficulty: (remote['difficulty'] ?? 'intermediate').toString(),
+            category: (remote['category'] ?? 'hybrid').toString(),
+            estimatedMinutes: remote['estimated_minutes'] is int ? remote['estimated_minutes'] as int : int.tryParse(remote['estimated_minutes']?.toString() ?? '') ?? 30,
+            exercises: exercisesStr,
+            source: 'community',
+            authorId: remote['author_id'] ?? remote['author_uid'],
+            authorName: remote['author_name'] ?? remote['author_name'],
+            isFavorite: false,
+            createdAt: remote['created_at'] is Timestamp ? (remote['created_at'] as Timestamp).toDate() : DateTime.now(),
+            updatedAt: remote['created_at'] is Timestamp ? (remote['created_at'] as Timestamp).toDate() : DateTime.now(),
+            lastSyncedAt: DateTime.now(),
+          );
+          // Persist the fetched remote set into local DB for offline availability
+          try {
+            await ref.read(setsRepositoryProvider).upsertFromFirestore(remote);
+          } catch (_) {
+            // Non-fatal: if upsert fails, continue and still show remote data
+          }
+        }
+      } catch (_) {}
+    }
+
+    // If still null, try fetching by Firestore document id (doc ID may be used as uuid)
+    if (set == null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('community_sets').doc(widget.workoutSetUuid).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          final exercisesRaw = data['exercises'];
+          final exercisesStr = exercisesRaw is String ? exercisesRaw : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
+          set = WorkoutSet(
+            id: 0,
+            uuid: widget.workoutSetUuid,
+            name: data['name'] ?? '',
+            description: data['description'],
+            difficulty: (data['difficulty'] ?? 'intermediate').toString(),
+            category: (data['category'] ?? 'hybrid').toString(),
+            estimatedMinutes: data['estimated_minutes'] is int ? data['estimated_minutes'] as int : int.tryParse(data['estimated_minutes']?.toString() ?? '') ?? 30,
+            exercises: exercisesStr,
+            source: 'community',
+            authorId: data['author_id'] ?? data['author_uid'],
+            authorName: data['author_name'],
+            isFavorite: false,
+            createdAt: data['created_at'] is Timestamp ? (data['created_at'] as Timestamp).toDate() : DateTime.now(),
+            updatedAt: data['created_at'] is Timestamp ? (data['created_at'] as Timestamp).toDate() : DateTime.now(),
+            lastSyncedAt: DateTime.now(),
+          );
+          // Persist the document into local DB so it becomes available offline
+          try {
+            await ref.read(setsRepositoryProvider).upsertFromFirestore(data);
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
     if (set != null && mounted) {
+      // Parse exercises outside setState to avoid capturing `set` (which analyzer
+      // may consider nullable inside the closure).
+      List<Map<String, dynamic>> parsedExercises = [];
+      try {
+        final exercisesStr = set.exercises;
+        final exercisesJson = jsonDecode(exercisesStr) as List<dynamic>;
+        parsedExercises = exercisesJson.cast<Map<String, dynamic>>();
+      } catch (e) {
+        parsedExercises = [];
+      }
+
       setState(() {
         _workoutSet = set;
-        // Parse exercises JSON
-        try {
-          final exercisesJson = jsonDecode(set.exercises) as List<dynamic>;
-          _exercises = exercisesJson.cast<Map<String, dynamic>>();
-        } catch (e) {
-          _exercises = [];
-        }
+        _exercises = parsedExercises;
       });
     }
   }
@@ -103,6 +179,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     await ref.read(sessionRepositoryProvider).startSession(
       workoutSetId: _workoutSet!.id,
       workoutSetName: _workoutSet!.name,
+      workoutSetUuid: _workoutSet!.uuid,
       totalExercises: _exercises.length,
       estimatedMinutes: _workoutSet!.estimatedMinutes,
     );

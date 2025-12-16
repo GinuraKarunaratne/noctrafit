@@ -38,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -71,7 +71,16 @@ class AppDatabase extends _$AppDatabase {
         );
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Handle future schema upgrades here
+        // Migration path from version 1 -> 2: add `workout_set_uuid` to active_sessions
+        if (from < 2) {
+          try {
+            await customStatement(
+              'ALTER TABLE active_sessions ADD COLUMN workout_set_uuid TEXT;'
+            );
+          } catch (_) {
+            // If ALTER fails (e.g., column already exists), ignore and continue
+          }
+        }
       },
     );
   }

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:convert';
 import 'package:noctrafit/app/providers/auth_provider.dart';
 import 'package:noctrafit/app/providers/repository_providers.dart';
 import 'package:noctrafit/data/local/db/app_database.dart';
@@ -68,31 +69,62 @@ final communitySetsProvider = StreamProvider<List<WorkoutSet>>((ref) {
       .collection('community_sets')
       .snapshots()
       .map((snapshot) {
-    // Convert Firestore docs to WorkoutSet objects
-    var sets = snapshot.docs.map((doc) {
-      final data = doc.data();
-      return WorkoutSet(
-        id: 0, // Firestore sets don't have local id
-        uuid: doc.id,
-        name: data['name'] ?? '',
-        description: data['description'],
-        difficulty: data['difficulty'] ?? 'intermediate',
-        category: data['category'] ?? 'hybrid',
-        source: 'community',
-        estimatedMinutes: data['estimated_minutes'] ?? 30,
-        exercises: data['exercises'] ?? [],
-        authorName: data['author_name'],
-        authorId: data['author_uid'],
-        isFavorite: false, // Will be checked separately via favorites provider
-        createdAt: data['created_at'] != null
-            ? (data['created_at'] as Timestamp).toDate()
-            : DateTime.now(),
-        updatedAt: data['created_at'] != null
-            ? (data['created_at'] as Timestamp).toDate()
-            : DateTime.now(),
-        lastSyncedAt: null,
-      );
-    }).toList();
+    // Convert Firestore docs to WorkoutSet objects (robust parsing)
+    var sets = <WorkoutSet>[];
+    for (final doc in snapshot.docs) {
+      try {
+        final data = doc.data();
+
+        // Normalize exercises to JSON string as required by WorkoutSet.exercises
+        String exercisesJson;
+        final rawExercises = data['exercises'];
+        if (rawExercises == null) {
+          exercisesJson = '[]';
+        } else if (rawExercises is String) {
+          exercisesJson = rawExercises;
+        } else {
+          // If it's List or Map, encode to JSON string
+          try {
+            exercisesJson = rawExercises is String ? rawExercises : jsonEncode(rawExercises);
+          } catch (_) {
+            exercisesJson = '[]';
+          }
+        }
+
+        DateTime createdAt;
+        if (data['created_at'] is Timestamp) {
+          createdAt = (data['created_at'] as Timestamp).toDate();
+        } else if (data['created_at'] is String) {
+          createdAt = DateTime.tryParse(data['created_at']) ?? DateTime.now();
+        } else {
+          createdAt = DateTime.now();
+        }
+
+        final ws = WorkoutSet(
+          id: 0, // Firestore sets don't have local id
+          uuid: doc.id,
+          name: data['name'] ?? '',
+          description: data['description'],
+          difficulty: (data['difficulty'] ?? 'intermediate').toString(),
+          category: (data['category'] ?? 'hybrid').toString(),
+          source: 'community',
+          estimatedMinutes: (data['estimated_minutes'] is int) ? data['estimated_minutes'] as int : int.tryParse(data['estimated_minutes']?.toString() ?? '') ?? 30,
+          exercises: exercisesJson,
+          authorName: data['author_name'],
+          authorId: data['author_uid'],
+          isFavorite: false,
+          createdAt: createdAt,
+          updatedAt: createdAt,
+          lastSyncedAt: null,
+        );
+
+        sets.add(ws);
+      } catch (e) {
+        // Skip malformed doc but don't crash the stream
+        // Optionally log via a logger if available
+        continue;
+      }
+    }
 
     // Apply filters
     if (searchQuery.isNotEmpty) {
