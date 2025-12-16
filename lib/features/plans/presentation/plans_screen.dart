@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../data/local/db/app_database.dart';
 import '../providers/plans_providers.dart';
@@ -30,6 +31,13 @@ class _PlansScreenState extends ConsumerState<PlansScreen>
     _searchController.addListener(() {
       ref.read(searchQueryProvider.notifier).state = _searchController.text;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _announceScreen());
+  }
+
+  Future<void> _announceScreen() async {
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speakScreenSummary('Workout Plans');
   }
 
   @override

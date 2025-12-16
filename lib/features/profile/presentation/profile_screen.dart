@@ -11,11 +11,27 @@ import '../providers/profile_providers.dart';
 import '../widgets/progress_heatmap_card.dart';
 
 /// Profile screen - User stats, heatmap, and settings
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _announceScreen());
+  }
+
+  Future<void> _announceScreen() async {
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speakScreenSummary('Profile');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     // Load real data from providers

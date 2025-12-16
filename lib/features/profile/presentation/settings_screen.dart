@@ -34,6 +34,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _announceScreen());
+  }
+
+  Future<void> _announceScreen() async {
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speakScreenSummary('Settings');
   }
 
   Future<void> _loadSettings() async {

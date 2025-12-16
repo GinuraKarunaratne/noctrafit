@@ -1,17 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../app/widgets/composite/luminous_chart_card.dart';
 import '../../../app/widgets/composite/stats_grid.dart';
 import '../providers/insights_providers.dart';
 
 /// Insights screen - Stats, charts, and analytics
-class InsightsScreen extends ConsumerWidget {
+class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends ConsumerState<InsightsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _announceScreen());
+  }
+
+  Future<void> _announceScreen() async {
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speakScreenSummary('Insights');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     // Load real data from providers

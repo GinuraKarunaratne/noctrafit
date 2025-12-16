@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/repository_providers.dart';
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../data/local/db/app_database.dart';
 
@@ -24,6 +25,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   void initState() {
     super.initState();
     _loadScheduleEntries();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _announceScreen());
+  }
+
+  Future<void> _announceScreen() async {
+    final tts = ref.read(ttsServiceProvider);
+    final count = _scheduleEntries.length;
+    await tts.speakScreenSummary('Calendar', details: '$count workouts scheduled');
   }
 
   Future<void> _loadScheduleEntries() async {
