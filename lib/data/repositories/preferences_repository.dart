@@ -46,4 +46,11 @@ class PreferencesRepository {
 
   Future<DateTime?> getLastSyncTime() => _dao.getLastSyncTime();
   Future<void> setLastSyncTime(DateTime dateTime) => _dao.setLastSyncTime(dateTime);
+
+  Future<String> getAccessibilityMode() async {
+    final mode = await get('accessibility_mode');
+    return mode ?? 'defaultNight';
+  }
+
+  Future<void> setAccessibilityMode(String mode) => set('accessibility_mode', mode);
 }

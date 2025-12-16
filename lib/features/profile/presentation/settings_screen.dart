@@ -6,6 +6,7 @@ import 'package:tabler_icons/tabler_icons.dart';
 import '../../../app/providers/auth_provider.dart';
 import '../../../app/providers/repository_providers.dart';
 import '../../../app/providers/service_providers.dart';
+import '../../../app/providers/accessibility_provider.dart';
 import '../../../app/theme/accessibility_palettes.dart';
 import '../../../app/theme/color_tokens.dart';
 
@@ -26,7 +27,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  AccessibilityMode _selectedMode = AccessibilityMode.defaultNight;
   bool _ttsEnabled = false;
   double _ttsRate = 0.5; // 0.0 = slow, 1.0 = normal
 
@@ -56,13 +56,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _updateAccessibilityMode(AccessibilityMode mode) async {
-    setState(() {
-      _selectedMode = mode;
-    });
-
-    // TODO: Update provider and persist to database
-    // ref.read(accessibilitySettingsProvider.notifier).setMode(mode);
-    // await ref.read(preferencesRepositoryProvider).setAccessibilityMode(mode);
+    await ref.read(accessibilityModeProvider.notifier).setMode(mode);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -163,6 +157,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final selectedMode = ref.watch(accessibilityModeProvider);
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
@@ -230,7 +225,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _getModeDescription(_selectedMode),
+                              _getModeDescription(selectedMode),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: ColorTokens.textSecondary,
                               ),
@@ -245,7 +240,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   // Mode selector
                   ...AccessibilityMode.values.map((mode) {
-                    final isSelected = mode == _selectedMode;
+                    final isSelected = mode == selectedMode;
                     return _ModeOption(
                       mode: mode,
                       name: _getModeName(mode),

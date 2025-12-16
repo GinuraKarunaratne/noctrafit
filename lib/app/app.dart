@@ -6,6 +6,7 @@ import 'theme/accessibility_palettes.dart';
 import 'router/app_router.dart';
 import 'providers/service_providers.dart';
 import 'providers/repository_providers.dart';
+import 'providers/accessibility_provider.dart';
 import '../data/local/db/app_database.dart';
 
 /// Main application widget
@@ -40,9 +41,8 @@ class _NoctraFitAppState extends ConsumerState<NoctraFitApp> {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Watch accessibility mode provider to switch themes
-    // For now, use Default Night mode
-    final theme = AppTheme.getTheme(AccessibilityMode.defaultNight);
+    final accessibilityMode = ref.watch(accessibilityModeProvider);
+    final theme = AppTheme.getTheme(accessibilityMode);
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
