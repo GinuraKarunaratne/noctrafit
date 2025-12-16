@@ -57,6 +57,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           setState(() => _isLoading = true);
           await _loadData();
           ref.invalidate(weeklyStatsProvider);
+          ref.invalidate(weeklyWorkoutsProvider);
+          ref.invalidate(weeklyMinutesProvider);
+          ref.invalidate(weeklyStreakProvider);
+          ref.invalidate(weeklyCompletionProvider);
         },
         child: SingleChildScrollView(
           child: Column(

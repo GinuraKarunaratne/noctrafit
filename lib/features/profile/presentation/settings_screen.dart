@@ -5,6 +5,7 @@ import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/auth_provider.dart';
 import '../../../app/providers/repository_providers.dart';
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/accessibility_palettes.dart';
 import '../../../app/theme/color_tokens.dart';
 
@@ -25,7 +26,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  // Mock state - will be replaced with actual providers
   AccessibilityMode _selectedMode = AccessibilityMode.defaultNight;
   bool _ttsEnabled = false;
   double _ttsRate = 0.5; // 0.0 = slow, 1.0 = normal
@@ -33,11 +33,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSettings();
+  }
 
-    // TODO: Load from providers
-    // _selectedMode = ref.read(accessibilitySettingsProvider);
-    // _ttsEnabled = ref.read(preferencesRepositoryProvider).getTtsEnabled();
-    // _ttsRate = ref.read(preferencesRepositoryProvider).getTtsRate();
+  Future<void> _loadSettings() async {
+    final prefs = ref.read(preferencesRepositoryProvider);
+    final enabled = await prefs.isTtsEnabled();
+    final rate = await prefs.getTtsRate();
+
+    if (mounted) {
+      setState(() {
+        _ttsEnabled = enabled;
+        _ttsRate = rate;
+      });
+    }
   }
 
   Future<void> _updateAccessibilityMode(AccessibilityMode mode) async {
@@ -64,9 +73,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _ttsEnabled = enabled;
     });
 
-    // TODO: Update provider and persist to database
-    // await ref.read(preferencesRepositoryProvider).setTtsEnabled(enabled);
-    // ref.read(ttsServiceProvider).setEnabled(enabled);
+    final prefs = ref.read(preferencesRepositoryProvider);
+    await prefs.setTtsEnabled(enabled);
+
+    final tts = ref.read(ttsServiceProvider);
+    if (enabled) {
+      await tts.enable();
+      await tts.setRate(_ttsRate);
+      await tts.speak('Text to speech enabled');
+    } else {
+      await tts.disable();
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -83,23 +100,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _ttsRate = rate;
     });
 
-    // TODO: Update provider and persist to database
-    // await ref.read(preferencesRepositoryProvider).setTtsRate(rate);
-    // ref.read(ttsServiceProvider).setRate(rate);
+    final prefs = ref.read(preferencesRepositoryProvider);
+    await prefs.setTtsRate(rate);
+
+    final tts = ref.read(ttsServiceProvider);
+    await tts.setRate(rate);
   }
 
   Future<void> _previewSettings() async {
-    // TODO: Use TTS service to speak preview
-    // await ref.read(ttsServiceProvider).speak(
-    //   'Settings preview. Color vision mode: ${_getModeName(_selectedMode)}. '
-    //   'Text to speech is ${_ttsEnabled ? 'enabled' : 'disabled'}. '
-    //   'Speech rate is ${_ttsRate < 0.5 ? 'slow' : 'normal'}.',
-    // );
+    final tts = ref.read(ttsServiceProvider);
+    final speedDesc = _ttsRate < 0.4 ? 'slow' : _ttsRate > 0.7 ? 'fast' : 'normal';
+    await tts.speak(
+      'Settings preview. Text to speech is enabled at $speedDesc speed. This is how navigation announcements will sound.',
+    );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Preview: This is how text-to-speech sounds'),
+          content: Text('Playing preview'),
           backgroundColor: ColorTokens.accent,
         ),
       );

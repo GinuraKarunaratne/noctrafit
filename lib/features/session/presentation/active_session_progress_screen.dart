@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart'; // ✅ added
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/repository_providers.dart';
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../data/local/db/app_database.dart';
 
@@ -52,6 +53,15 @@ class _ActiveSessionProgressScreenState
     super.initState();
     _loadSession();
     _startTimer();
+    _announceStart();
+  }
+
+  Future<void> _announceStart() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    final tts = ref.read(ttsServiceProvider);
+    if (_session != null) {
+      await tts.speakWorkoutStarted(_session!.workoutSetName);
+    }
   }
 
   // ✅ Safe helpers to avoid Null -> String crashes
@@ -137,9 +147,12 @@ class _ActiveSessionProgressScreenState
     final progress = _getProgressPercentage();
     final remainingMinutes = _session!.estimatedMinutes - (_elapsed.inMinutes);
 
+    final tts = ref.read(ttsServiceProvider);
+
     // 50% milestone
     if (progress >= 0.5 && !_hasSpoken50Percent) {
       _hasSpoken50Percent = true;
+      tts.speakHalfwayMilestone();
     }
 
     // 10 minutes remaining
@@ -147,6 +160,7 @@ class _ActiveSessionProgressScreenState
         remainingMinutes > 9 &&
         !_hasSpoken10MinRemaining) {
       _hasSpoken10MinRemaining = true;
+      tts.speakTenMinutesRemaining();
     }
   }
 
@@ -169,12 +183,25 @@ class _ActiveSessionProgressScreenState
 
     await ref.read(sessionRepositoryProvider).progressToNextExercise();
     await _loadSession();
+
+    // Announce next exercise
+    final tts = ref.read(ttsServiceProvider);
+    if (_session != null && _exercises.isNotEmpty) {
+      final nextIndex = (_session!.currentExerciseIndex + 1).clamp(0, _exercises.length - 1);
+      final nextExercise = _exercises[nextIndex];
+      final exerciseName = _safeString(nextExercise['name']);
+      await tts.speakNextExercise(exerciseName);
+    }
   }
 
   Future<void> _completeWorkout() async {
     if (_session == null || _workoutSet == null) return;
 
     _timer?.cancel();
+
+    // Announce completion
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speakWorkoutCompleted();
 
     // Complete session and save to completion logs
     await ref.read(sessionRepositoryProvider).completeSession();
