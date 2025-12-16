@@ -88,7 +88,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_ttsEnabled ? 'Text-to-Speech enabled' : 'Text-to-Speech disabled'),
+          content: Text(
+            _ttsEnabled ? 'Text-to-Speech enabled' : 'Text-to-Speech disabled',
+          ),
           backgroundColor: ColorTokens.success,
         ),
       );
@@ -109,14 +111,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _previewSettings() async {
     final tts = ref.read(ttsServiceProvider);
-    final speedDesc = _ttsRate < 0.4 ? 'slow' : _ttsRate > 0.7 ? 'fast' : 'normal';
+    final speedDesc = _ttsRate < 0.4
+        ? 'slow'
+        : _ttsRate > 0.7
+        ? 'fast'
+        : 'normal';
     await tts.speak(
       'Settings preview. Text to speech is enabled at $speedDesc speed. This is how navigation announcements will sound.',
     );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+         SnackBar(
           content: Text('Playing preview'),
           backgroundColor: ColorTokens.accent,
         ),
@@ -162,7 +168,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: ColorTokens.background,
       appBar: AppBar(
-        title: const Text(
+        title:  Text(
           'Settings',
           style: TextStyle(
             color: ColorTokens.textPrimary,
@@ -172,7 +178,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         backgroundColor: ColorTokens.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(TablerIcons.arrow_left, color: ColorTokens.textSecondary),
+          icon: Icon(TablerIcons.arrow_left, color: ColorTokens.textSecondary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -209,7 +215,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(TablerIcons.palette, color: ColorTokens.accent, size: 20),
+                        child:  Icon(
+                          TablerIcons.palette,
+                          color: ColorTokens.accent,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -274,7 +284,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(TablerIcons.volume, color: ColorTokens.accent, size: 20),
+                        child:  Icon(
+                          TablerIcons.volume,
+                          color: ColorTokens.accent,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -308,13 +322,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   if (_ttsEnabled) ...[
                     const SizedBox(height: 16),
-                    const Divider(color: ColorTokens.border, height: 1),
+                     Divider(color: ColorTokens.border, height: 1),
                     const SizedBox(height: 16),
 
                     // TTS rate slider
                     Row(
                       children: [
-                        const Icon(TablerIcons.gauge, color: ColorTokens.accent, size: 20),
+                         Icon(
+                          TablerIcons.gauge,
+                          color: ColorTokens.accent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -373,7 +391,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           foregroundColor: ColorTokens.accent,
-                          side: const BorderSide(color: ColorTokens.accent),
+                          side:  BorderSide(color: ColorTokens.accent),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -400,7 +418,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Consumer(
               builder: (context, ref, child) {
                 return FutureBuilder<bool?>(
-                  future: ref.read(preferencesRepositoryProvider).getBool('notifications_enabled'),
+                  future: ref
+                      .read(preferencesRepositoryProvider)
+                      .getBool('notifications_enabled'),
                   builder: (context, snapshot) {
                     final enabled = snapshot.data ?? true;
                     return _SettingTile(
@@ -411,7 +431,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         value: enabled,
                         activeThumbColor: ColorTokens.accent,
                         onChanged: (value) async {
-                          await ref.read(preferencesRepositoryProvider).setBool('notifications_enabled', value);
+                          await ref
+                              .read(preferencesRepositoryProvider)
+                              .setBool('notifications_enabled', value);
                         },
                       ),
                     );
@@ -436,11 +458,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: TablerIcons.cloud,
               title: 'Cloud Sync',
               subtitle: 'Last synced: 2 hours ago',
-              trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.textSecondary),
+              trailing:  Icon(
+                TablerIcons.chevron_right,
+                color: ColorTokens.textSecondary,
+              ),
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Syncing...')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Syncing...')));
               },
             ),
 
@@ -477,26 +502,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: TablerIcons.logout,
                   title: 'Logout',
                   subtitle: 'Sign out of your account',
-                  trailing: const Icon(TablerIcons.chevron_right, color: ColorTokens.error),
+                  trailing:  Icon(
+                    TablerIcons.chevron_right,
+                    color: ColorTokens.error,
+                  ),
                   onTap: () async {
                     // Show confirmation dialog
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
                         backgroundColor: ColorTokens.surface,
-                        title: const Text('Logout', style: TextStyle(color: ColorTokens.textPrimary)),
-                        content: const Text(
+                        title:  Text(
+                          'Logout',
+                          style: TextStyle(color: ColorTokens.textPrimary),
+                        ),
+                        content:  Text(
                           'Are you sure you want to logout?',
                           style: TextStyle(color: ColorTokens.textSecondary),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+                            child:  Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: ColorTokens.textSecondary,
+                              ),
+                            ),
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
-                            child: const Text('Logout', style: TextStyle(color: ColorTokens.error)),
+                            child:  Text(
+                              'Logout',
+                              style: TextStyle(color: ColorTokens.error),
+                            ),
                           ),
                         ],
                       ),
@@ -617,7 +656,9 @@ class _ModeOption extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? ColorTokens.accent.withOpacity(0.1) : Colors.transparent,
+          color: isSelected
+              ? ColorTokens.accent.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? ColorTokens.accent : ColorTokens.border,
@@ -644,13 +685,19 @@ class _ModeOption extends StatelessWidget {
               child: Text(
                 name,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isSelected ? ColorTokens.accent : ColorTokens.textPrimary,
+                  color: isSelected
+                      ? ColorTokens.accent
+                      : ColorTokens.textPrimary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             ),
             if (isSelected)
-              const Icon(TablerIcons.check, color: ColorTokens.accent, size: 20),
+               Icon(
+                TablerIcons.check,
+                color: ColorTokens.accent,
+                size: 20,
+              ),
           ],
         ),
       ),

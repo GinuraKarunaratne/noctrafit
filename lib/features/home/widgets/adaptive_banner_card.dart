@@ -188,7 +188,7 @@ class AdaptiveBannerCard extends StatelessWidget {
 
               // Arrow icon (if tappable)
               if (onTap != null)
-                const Icon(
+                 Icon(
                   Icons.arrow_forward_ios,
                   color: ColorTokens.accent,
                   size: 16,
@@ -215,7 +215,7 @@ class AdaptiveBannerCard extends StatelessWidget {
           ),
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.only(left: 20),
-          child: const Icon(
+          child: Icon(
             Icons.delete_outline,
             color: ColorTokens.error,
             size: 28,
@@ -229,7 +229,7 @@ class AdaptiveBannerCard extends StatelessWidget {
           ),
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
-          child: const Icon(
+          child:  Icon(
             Icons.delete_outline,
             color: ColorTokens.error,
             size: 28,

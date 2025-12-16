@@ -27,10 +27,7 @@ import '../../../data/local/db/app_database.dart';
 class ActiveSessionProgressScreen extends ConsumerStatefulWidget {
   final String sessionUuid;
 
-  const ActiveSessionProgressScreen({
-    super.key,
-    required this.sessionUuid,
-  });
+  const ActiveSessionProgressScreen({super.key, required this.sessionUuid});
 
   @override
   ConsumerState<ActiveSessionProgressScreen> createState() =>
@@ -84,18 +81,24 @@ class _ActiveSessionProgressScreenState
   }
 
   Future<void> _loadSession() async {
-    final session = await ref.read(sessionRepositoryProvider).getActiveSession();
+    final session = await ref
+        .read(sessionRepositoryProvider)
+        .getActiveSession();
     if (session != null && mounted) {
       // Get all sets and find by ID
       final allSets = await ref.read(setsRepositoryProvider).getAllSets();
 
       // Try to find by numeric id first; avoid throwing if not present.
-      final matching = allSets.where((set) => set.id == session.workoutSetId).toList();
+      final matching = allSets
+          .where((set) => set.id == session.workoutSetId)
+          .toList();
       WorkoutSet? workoutSet = matching.isNotEmpty ? matching.first : null;
 
       // If not found by id, try to find by UUID (if session stores it)
       if (workoutSet == null && session.workoutSetUuid != null) {
-        workoutSet = await ref.read(setsRepositoryProvider).getSetByUuid(session.workoutSetUuid!);
+        workoutSet = await ref
+            .read(setsRepositoryProvider)
+            .getSetByUuid(session.workoutSetUuid!);
       }
 
       // If still not found, fallback to first available set to avoid crash (UI will treat as loading)
@@ -110,7 +113,8 @@ class _ActiveSessionProgressScreenState
 
         // Parse exercises JSON defensively
         try {
-          final exercisesJson = jsonDecode(_workoutSet?.exercises ?? '[]') as List<dynamic>;
+          final exercisesJson =
+              jsonDecode(_workoutSet?.exercises ?? '[]') as List<dynamic>;
           _exercises = exercisesJson.cast<Map<String, dynamic>>();
         } catch (e) {
           _exercises = [];
@@ -177,7 +181,8 @@ class _ActiveSessionProgressScreenState
   }
 
   void _nextExercise() async {
-    if (_session == null || _session!.currentExerciseIndex >= _exercises.length - 1) {
+    if (_session == null ||
+        _session!.currentExerciseIndex >= _exercises.length - 1) {
       return;
     }
 
@@ -187,7 +192,10 @@ class _ActiveSessionProgressScreenState
     // Announce next exercise
     final tts = ref.read(ttsServiceProvider);
     if (_session != null && _exercises.isNotEmpty) {
-      final nextIndex = (_session!.currentExerciseIndex + 1).clamp(0, _exercises.length - 1);
+      final nextIndex = (_session!.currentExerciseIndex + 1).clamp(
+        0,
+        _exercises.length - 1,
+      );
       final nextExercise = _exercises[nextIndex];
       final exerciseName = _safeString(nextExercise['name']);
       await tts.speakNextExercise(exerciseName);
@@ -210,7 +218,8 @@ class _ActiveSessionProgressScreenState
       // Parse completed exercises count
       int completedCount = 0;
       try {
-        final completed = jsonDecode(_session!.completedExercises) as List<dynamic>;
+        final completed =
+            jsonDecode(_session!.completedExercises) as List<dynamic>;
         completedCount = completed.length;
       } catch (e) {
         completedCount = _session!.currentExerciseIndex;
@@ -242,12 +251,8 @@ class _ActiveSessionProgressScreenState
     if (_session == null || _workoutSet == null || _exercises.isEmpty) {
       return Scaffold(
         backgroundColor: ColorTokens.background,
-        appBar: AppBar(
-          title: const Text('Loading...'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        appBar: AppBar(title: const Text('Loading...')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -270,7 +275,7 @@ class _ActiveSessionProgressScreenState
       appBar: AppBar(
         title: Text(
           _workoutSet!.name,
-          style: const TextStyle(
+          style:  TextStyle(
             color: ColorTokens.textPrimary,
             fontWeight: FontWeight.bold,
           ),
@@ -278,7 +283,7 @@ class _ActiveSessionProgressScreenState
         backgroundColor: ColorTokens.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
+          icon: Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
           onPressed: () {
             // Avoid popping the last page (which causes GoRouter assertion).
             if (Navigator.canPop(context)) {
@@ -291,29 +296,32 @@ class _ActiveSessionProgressScreenState
         ),
         actions: [
           IconButton(
-            icon: const Icon(TablerIcons.x, color: ColorTokens.textSecondary),
+            icon: Icon(TablerIcons.x, color: ColorTokens.textSecondary),
             onPressed: () async {
               // Show confirmation dialog
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
                   backgroundColor: ColorTokens.surface,
-                  title: const Text(
+                  title: Text(
                     'End Workout?',
                     style: TextStyle(color: ColorTokens.textPrimary),
                   ),
-                  content: const Text(
+                  content: Text(
                     'Are you sure you want to end this workout? Progress will be saved.',
                     style: TextStyle(color: ColorTokens.textSecondary),
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
+                      child: Text('Cancel'),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('End', style: TextStyle(color: ColorTokens.error)),
+                      child: Text(
+                        'End',
+                        style: TextStyle(color: ColorTokens.error),
+                      ),
                     ),
                   ],
                 ),
@@ -398,7 +406,10 @@ class _ActiveSessionProgressScreenState
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -482,13 +493,17 @@ class _ActiveSessionProgressScreenState
                         children: [
                           Icon(
                             TablerIcons.chevron_left,
-                            color: safeIndex > 0 ? ColorTokens.textPrimary : ColorTokens.textSecondary,
+                            color: safeIndex > 0
+                                ? ColorTokens.textPrimary
+                                : ColorTokens.textSecondary,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Previous',
                             style: TextStyle(
-                              color: safeIndex > 0 ? ColorTokens.textPrimary : ColorTokens.textSecondary,
+                              color: safeIndex > 0
+                                  ? ColorTokens.textPrimary
+                                  : ColorTokens.textSecondary,
                             ),
                           ),
                         ],
@@ -501,7 +516,9 @@ class _ActiveSessionProgressScreenState
                   // Next button
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: safeIndex < _exercises.length - 1 ? _nextExercise : null,
+                      onPressed: safeIndex < _exercises.length - 1
+                          ? _nextExercise
+                          : null,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: safeIndex < _exercises.length - 1
@@ -554,11 +571,11 @@ class _ActiveSessionProgressScreenState
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(TablerIcons.check, color: ColorTokens.background),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
                         'Complete Workout',
                         style: TextStyle(
@@ -697,10 +714,7 @@ class _ExerciseDetail extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _ExerciseDetail({
-    required this.icon,
-    required this.label,
-  });
+  const _ExerciseDetail({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -756,7 +770,7 @@ class _CompletionDialog extends StatelessWidget {
               color: ColorTokens.success.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child:  Icon(
               TablerIcons.circle_check_filled,
               color: ColorTokens.success,
               size: 48,
@@ -812,7 +826,7 @@ class _CompletionDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
+            child:  Text(
               'Done',
               style: TextStyle(
                 color: ColorTokens.background,

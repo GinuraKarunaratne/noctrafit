@@ -39,16 +39,66 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
 
   // Mock exercise library - will be replaced with actual data from database
   final List<Map<String, dynamic>> _availableExercises = [
-    {'uuid': 'ex-001', 'name': 'Push-ups', 'muscleGroup': 'Chest', 'equipment': 'None'},
-    {'uuid': 'ex-002', 'name': 'Squats', 'muscleGroup': 'Legs', 'equipment': 'None'},
-    {'uuid': 'ex-003', 'name': 'Plank', 'muscleGroup': 'Core', 'equipment': 'None'},
-    {'uuid': 'ex-004', 'name': 'Lunges', 'muscleGroup': 'Legs', 'equipment': 'None'},
-    {'uuid': 'ex-005', 'name': 'Jumping Jacks', 'muscleGroup': 'Full Body', 'equipment': 'None'},
-    {'uuid': 'ex-006', 'name': 'Burpees', 'muscleGroup': 'Full Body', 'equipment': 'None'},
-    {'uuid': 'ex-007', 'name': 'Mountain Climbers', 'muscleGroup': 'Core', 'equipment': 'None'},
-    {'uuid': 'ex-008', 'name': 'Bicycle Crunches', 'muscleGroup': 'Core', 'equipment': 'None'},
-    {'uuid': 'ex-009', 'name': 'Tricep Dips', 'muscleGroup': 'Arms', 'equipment': 'Chair'},
-    {'uuid': 'ex-010', 'name': 'Wall Sit', 'muscleGroup': 'Legs', 'equipment': 'Wall'},
+    {
+      'uuid': 'ex-001',
+      'name': 'Push-ups',
+      'muscleGroup': 'Chest',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-002',
+      'name': 'Squats',
+      'muscleGroup': 'Legs',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-003',
+      'name': 'Plank',
+      'muscleGroup': 'Core',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-004',
+      'name': 'Lunges',
+      'muscleGroup': 'Legs',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-005',
+      'name': 'Jumping Jacks',
+      'muscleGroup': 'Full Body',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-006',
+      'name': 'Burpees',
+      'muscleGroup': 'Full Body',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-007',
+      'name': 'Mountain Climbers',
+      'muscleGroup': 'Core',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-008',
+      'name': 'Bicycle Crunches',
+      'muscleGroup': 'Core',
+      'equipment': 'None',
+    },
+    {
+      'uuid': 'ex-009',
+      'name': 'Tricep Dips',
+      'muscleGroup': 'Arms',
+      'equipment': 'Chair',
+    },
+    {
+      'uuid': 'ex-010',
+      'name': 'Wall Sit',
+      'muscleGroup': 'Legs',
+      'equipment': 'Wall',
+    },
   ];
 
   @override
@@ -63,7 +113,8 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ExercisePickerSheet(exercises: _availableExercises),
+      builder: (context) =>
+          _ExercisePickerSheet(exercises: _availableExercises),
     );
 
     if (result != null) {
@@ -87,7 +138,8 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
   void _editExercise(int index) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _ExerciseEditDialog(exercise: _selectedExercises[index]),
+      builder: (context) =>
+          _ExerciseEditDialog(exercise: _selectedExercises[index]),
     );
 
     if (result != null) {
@@ -101,7 +153,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedExercises.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Please add at least one exercise'),
           backgroundColor: ColorTokens.error,
         ),
@@ -110,19 +162,21 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
     }
 
     // Save to database
-    await ref.read(setsRepositoryProvider).createCustomSet(
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      difficulty: _difficulty.toLowerCase(),
-      category: _category.toLowerCase(),
-      estimatedMinutes: _estimatedMinutes,
-      exercisesJson: jsonEncode(_selectedExercises),
-      authorName: null,
-    );
+    await ref
+        .read(setsRepositoryProvider)
+        .createCustomSet(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          difficulty: _difficulty.toLowerCase(),
+          category: _category.toLowerCase(),
+          estimatedMinutes: _estimatedMinutes,
+          exercisesJson: jsonEncode(_selectedExercises),
+          authorName: null,
+        );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Workout saved locally!'),
           backgroundColor: ColorTokens.success,
         ),
@@ -135,7 +189,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedExercises.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Please add at least one exercise'),
           backgroundColor: ColorTokens.error,
         ),
@@ -149,23 +203,37 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: ColorTokens.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Publish to Community?', style: TextStyle(color: ColorTokens.textPrimary)),
-        content: const Text(
+        title: Text(
+          'Publish to Community?',
+          style: TextStyle(color: ColorTokens.textPrimary),
+        ),
+        content: Text(
           'This will make your workout visible to all users. You can edit or delete it later.',
           style: TextStyle(color: ColorTokens.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: ColorTokens.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: ColorTokens.accent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Publish', style: TextStyle(color: ColorTokens.background, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Publish',
+              style: TextStyle(
+                color: ColorTokens.background,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -177,47 +245,57 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please login to publish'), backgroundColor: ColorTokens.error),
+          SnackBar(
+            content: Text('Please login to publish'),
+            backgroundColor: ColorTokens.error,
+          ),
         );
       }
       return;
     }
 
     // Save locally first
-    final workoutSet = await ref.read(setsRepositoryProvider).createCustomSet(
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      difficulty: _difficulty.toLowerCase(),
-      category: _category.toLowerCase(),
-      estimatedMinutes: _estimatedMinutes,
-      exercisesJson: jsonEncode(_selectedExercises),
-      authorName: user.email?.split('@').first,
-    );
+    final workoutSet = await ref
+        .read(setsRepositoryProvider)
+        .createCustomSet(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          difficulty: _difficulty.toLowerCase(),
+          category: _category.toLowerCase(),
+          estimatedMinutes: _estimatedMinutes,
+          exercisesJson: jsonEncode(_selectedExercises),
+          authorName: user.email?.split('@').first,
+        );
 
     // Upload to Firestore community_sets
     try {
-      await FirebaseFirestore.instance.collection('community_sets').doc(workoutSet.uuid).set({
-        'name': workoutSet.name,
-        'description': workoutSet.description,
-        'difficulty': workoutSet.difficulty,
-        'category': workoutSet.category,
-        'estimated_minutes': workoutSet.estimatedMinutes,
-        'exercises': workoutSet.exercises,
-        'author_name': workoutSet.authorName,
-        'author_uid': user.uid,
-        'created_at': FieldValue.serverTimestamp(),
-        'views_count': 0,
-        'downloads_count': 0,
-        'favorites_count': 0,
-      });
+      await FirebaseFirestore.instance
+          .collection('community_sets')
+          .doc(workoutSet.uuid)
+          .set({
+            'name': workoutSet.name,
+            'description': workoutSet.description,
+            'difficulty': workoutSet.difficulty,
+            'category': workoutSet.category,
+            'estimated_minutes': workoutSet.estimatedMinutes,
+            'exercises': workoutSet.exercises,
+            'author_name': workoutSet.authorName,
+            'author_uid': user.uid,
+            'created_at': FieldValue.serverTimestamp(),
+            'views_count': 0,
+            'downloads_count': 0,
+            'favorites_count': 0,
+          });
     } catch (e) {
       // Fallback to sync queue
-      await ref.read(setsRepositoryProvider).queueForCommunityUpload(workoutSet);
+      await ref
+          .read(setsRepositoryProvider)
+          .queueForCommunityUpload(workoutSet);
     }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Workout published to community!'),
           backgroundColor: ColorTokens.success,
         ),
@@ -233,11 +311,17 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
     return Scaffold(
       backgroundColor: ColorTokens.background,
       appBar: AppBar(
-        title: const Text('Create Workout', style: TextStyle(color: ColorTokens.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Create Workout',
+          style: TextStyle(
+            color: ColorTokens.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: ColorTokens.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(TablerIcons.x, color: ColorTokens.textSecondary),
+          icon: Icon(TablerIcons.x, color: ColorTokens.textSecondary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -259,23 +343,25 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
-                style: const TextStyle(color: ColorTokens.textPrimary),
+                style: TextStyle(color: ColorTokens.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'e.g., Night Shift Energy Boost',
-                  hintStyle: TextStyle(color: ColorTokens.textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(
+                    color: ColorTokens.textSecondary.withOpacity(0.5),
+                  ),
                   filled: true,
                   fillColor: ColorTokens.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: ColorTokens.border),
+                    borderSide: BorderSide(color: ColorTokens.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: ColorTokens.border),
+                    borderSide: BorderSide(color: ColorTokens.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: ColorTokens.accent, width: 2),
+                    borderSide: BorderSide(color: ColorTokens.accent, width: 2),
                   ),
                 ),
                 validator: (value) {
@@ -299,24 +385,26 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _descriptionController,
-                style: const TextStyle(color: ColorTokens.textPrimary),
+                style: TextStyle(color: ColorTokens.textPrimary),
                 maxLines: 3,
                 decoration: InputDecoration(
                   hintText: 'Describe your workout...',
-                  hintStyle: TextStyle(color: ColorTokens.textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(
+                    color: ColorTokens.textSecondary.withOpacity(0.5),
+                  ),
                   filled: true,
                   fillColor: ColorTokens.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: ColorTokens.border),
+                    borderSide: BorderSide(color: ColorTokens.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: ColorTokens.border),
+                    borderSide: BorderSide(color: ColorTokens.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: ColorTokens.accent, width: 2),
+                    borderSide: BorderSide(color: ColorTokens.accent, width: 2),
                   ),
                 ),
                 validator: (value) {
@@ -346,21 +434,23 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           initialValue: _difficulty,
-                          style: const TextStyle(color: ColorTokens.textPrimary),
+                          style: TextStyle(color: ColorTokens.textPrimary),
                           dropdownColor: ColorTokens.surface,
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: ColorTokens.surface,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ColorTokens.border),
+                              borderSide: BorderSide(color: ColorTokens.border),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ColorTokens.border),
+                              borderSide: BorderSide(color: ColorTokens.border),
                             ),
                           ),
-                          items: ['Beginner', 'Intermediate', 'Advanced'].map((String value) {
+                          items: ['Beginner', 'Intermediate', 'Advanced'].map((
+                            String value,
+                          ) {
                             return DropdownMenuItem<String>(
                               value: value,
                               child: Text(value),
@@ -388,26 +478,28 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           initialValue: _category,
-                          style: const TextStyle(color: ColorTokens.textPrimary),
+                          style: TextStyle(color: ColorTokens.textPrimary),
                           dropdownColor: ColorTokens.surface,
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: ColorTokens.surface,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ColorTokens.border),
+                              borderSide: BorderSide(color: ColorTokens.border),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ColorTokens.border),
+                              borderSide: BorderSide(color: ColorTokens.border),
                             ),
                           ),
-                          items: ['Cardio', 'Strength', 'Flexibility', 'Mixed'].map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            );
-                          }).toList(),
+                          items: ['Cardio', 'Strength', 'Flexibility', 'Mixed']
+                              .map((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value),
+                                );
+                              })
+                              .toList(),
                           onChanged: (value) {
                             setState(() => _category = value!);
                           },
@@ -438,7 +530,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(TablerIcons.clock, color: ColorTokens.accent),
+                    Icon(TablerIcons.clock, color: ColorTokens.accent),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Slider(
@@ -480,8 +572,18 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                   ),
                   TextButton.icon(
                     onPressed: _addExercise,
-                    icon: const Icon(TablerIcons.plus, color: ColorTokens.accent, size: 20),
-                    label: const Text('Add Exercise', style: TextStyle(color: ColorTokens.accent, fontWeight: FontWeight.w600)),
+                    icon: Icon(
+                      TablerIcons.plus,
+                      color: ColorTokens.accent,
+                      size: 20,
+                    ),
+                    label: Text(
+                      'Add Exercise',
+                      style: TextStyle(
+                        color: ColorTokens.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -495,21 +597,34 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                   decoration: BoxDecoration(
                     color: ColorTokens.surface,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: ColorTokens.border, style: BorderStyle.solid),
+                    border: Border.all(
+                      color: ColorTokens.border,
+                      style: BorderStyle.solid,
+                    ),
                   ),
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(TablerIcons.barbell_off, size: 48, color: ColorTokens.textSecondary.withOpacity(0.5)),
+                        Icon(
+                          TablerIcons.barbell_off,
+                          size: 48,
+                          color: ColorTokens.textSecondary.withOpacity(0.5),
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           'No exercises added yet',
-                          style: TextStyle(color: ColorTokens.textSecondary, fontSize: 16),
+                          style: TextStyle(
+                            color: ColorTokens.textSecondary,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Tap "Add Exercise" to get started',
-                          style: TextStyle(color: ColorTokens.textSecondary.withOpacity(0.7), fontSize: 14),
+                          style: TextStyle(
+                            color: ColorTokens.textSecondary.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -539,7 +654,9 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: ColorTokens.background,
-            border: Border(top: BorderSide(color: ColorTokens.border, width: 1)),
+            border: Border(
+              top: BorderSide(color: ColorTokens.border, width: 1),
+            ),
           ),
           child: Row(
             children: [
@@ -549,10 +666,18 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                   onPressed: _saveLocally,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: ColorTokens.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: ColorTokens.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('Save Locally', style: TextStyle(color: ColorTokens.textPrimary, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Save Locally',
+                    style: TextStyle(
+                      color: ColorTokens.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
 
@@ -566,14 +691,25 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: ColorTokens.accent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(TablerIcons.cloud_upload, color: ColorTokens.background),
+                      Icon(
+                        TablerIcons.cloud_upload,
+                        color: ColorTokens.background,
+                      ),
                       SizedBox(width: 8),
-                      Text('Publish to Community', style: TextStyle(color: ColorTokens.background, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Publish to Community',
+                        style: TextStyle(
+                          color: ColorTokens.background,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -624,7 +760,13 @@ class _ExerciseItem extends StatelessWidget {
               border: Border.all(color: ColorTokens.accent.withOpacity(0.3)),
             ),
             child: Center(
-              child: Text('$number', style: const TextStyle(color: ColorTokens.accent, fontWeight: FontWeight.bold)),
+              child: Text(
+                '$number',
+                style: TextStyle(
+                  color: ColorTokens.accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
 
@@ -635,11 +777,19 @@ class _ExerciseItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(exercise['name'], style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary, fontWeight: FontWeight.bold)),
+                Text(
+                  exercise['name'],
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: ColorTokens.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '${exercise['sets']} sets × ${exercise['reps'] ?? exercise['duration']} • Rest ${exercise['rest']}',
-                  style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: ColorTokens.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -647,11 +797,11 @@ class _ExerciseItem extends StatelessWidget {
 
           // Actions
           IconButton(
-            icon: const Icon(TablerIcons.edit, size: 20, color: ColorTokens.accent),
+            icon: Icon(TablerIcons.edit, size: 20, color: ColorTokens.accent),
             onPressed: onEdit,
           ),
           IconButton(
-            icon: const Icon(TablerIcons.trash, size: 20, color: ColorTokens.error),
+            icon: Icon(TablerIcons.trash, size: 20, color: ColorTokens.error),
             onPressed: onRemove,
           ),
         ],
@@ -672,7 +822,7 @@ class _ExercisePickerSheet extends StatelessWidget {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: ColorTokens.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -681,15 +831,21 @@ class _ExercisePickerSheet extends StatelessWidget {
           // Header
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: ColorTokens.border)),
             ),
             child: Row(
               children: [
-                Text('Select Exercise', style: theme.textTheme.titleLarge?.copyWith(color: ColorTokens.textPrimary, fontWeight: FontWeight.bold)),
+                Text(
+                  'Select Exercise',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: ColorTokens.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(TablerIcons.x, color: ColorTokens.textSecondary),
+                  icon: Icon(TablerIcons.x, color: ColorTokens.textSecondary),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -704,11 +860,14 @@ class _ExercisePickerSheet extends StatelessWidget {
               itemBuilder: (context, index) {
                 final exercise = exercises[index];
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   tileColor: ColorTokens.background,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: const BorderSide(color: ColorTokens.border),
+                    side:  BorderSide(color: ColorTokens.border),
                   ),
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -716,10 +875,23 @@ class _ExercisePickerSheet extends StatelessWidget {
                       color: ColorTokens.accent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(TablerIcons.barbell, color: ColorTokens.accent, size: 24),
+                    child: Icon(
+                      TablerIcons.barbell,
+                      color: ColorTokens.accent,
+                      size: 24,
+                    ),
                   ),
-                  title: Text(exercise['name'], style: const TextStyle(color: ColorTokens.textPrimary, fontWeight: FontWeight.w600)),
-                  subtitle: Text('${exercise['muscleGroup']} • ${exercise['equipment']}', style: const TextStyle(color: ColorTokens.textSecondary)),
+                  title: Text(
+                    exercise['name'],
+                    style: TextStyle(
+                      color: ColorTokens.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${exercise['muscleGroup']} • ${exercise['equipment']}',
+                    style: TextStyle(color: ColorTokens.textSecondary),
+                  ),
                   onTap: () => Navigator.pop(context, exercise),
                 );
               },
@@ -761,24 +933,52 @@ class _ExerciseEditDialogState extends State<_ExerciseEditDialog> {
     return AlertDialog(
       backgroundColor: ColorTokens.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text('Edit Exercise', style: theme.textTheme.titleLarge?.copyWith(color: ColorTokens.textPrimary, fontWeight: FontWeight.bold)),
+      title: Text(
+        'Edit Exercise',
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: ColorTokens.textPrimary,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Sets
           Row(
             children: [
-              const Icon(TablerIcons.repeat, color: ColorTokens.accent, size: 20),
+              Icon(TablerIcons.repeat, color: ColorTokens.accent, size: 20),
               const SizedBox(width: 12),
-              Expanded(child: Text('Sets', style: const TextStyle(color: ColorTokens.textPrimary))),
-              IconButton(
-                icon: const Icon(TablerIcons.minus, color: ColorTokens.textSecondary, size: 20),
-                onPressed: () => setState(() => _sets = (_sets - 1).clamp(1, 10)),
+              Expanded(
+                child: Text(
+                  'Sets',
+                  style: TextStyle(color: ColorTokens.textPrimary),
+                ),
               ),
-              Text('$_sets', style: const TextStyle(color: ColorTokens.accent, fontWeight: FontWeight.bold, fontSize: 18)),
               IconButton(
-                icon: const Icon(TablerIcons.plus, color: ColorTokens.textSecondary, size: 20),
-                onPressed: () => setState(() => _sets = (_sets + 1).clamp(1, 10)),
+                icon: Icon(
+                  TablerIcons.minus,
+                  color: ColorTokens.textSecondary,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _sets = (_sets - 1).clamp(1, 10)),
+              ),
+              Text(
+                '$_sets',
+                style: TextStyle(
+                  color: ColorTokens.accent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  TablerIcons.plus,
+                  color: ColorTokens.textSecondary,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _sets = (_sets + 1).clamp(1, 10)),
               ),
             ],
           ),
@@ -786,17 +986,39 @@ class _ExerciseEditDialogState extends State<_ExerciseEditDialog> {
           // Reps
           Row(
             children: [
-              const Icon(TablerIcons.number, color: ColorTokens.accent, size: 20),
+              Icon(TablerIcons.number, color: ColorTokens.accent, size: 20),
               const SizedBox(width: 12),
-              Expanded(child: Text('Reps', style: const TextStyle(color: ColorTokens.textPrimary))),
-              IconButton(
-                icon: const Icon(TablerIcons.minus, color: ColorTokens.textSecondary, size: 20),
-                onPressed: () => setState(() => _reps = (_reps - 1).clamp(1, 50)),
+              Expanded(
+                child: Text(
+                  'Reps',
+                  style: TextStyle(color: ColorTokens.textPrimary),
+                ),
               ),
-              Text('$_reps', style: const TextStyle(color: ColorTokens.accent, fontWeight: FontWeight.bold, fontSize: 18)),
               IconButton(
-                icon: const Icon(TablerIcons.plus, color: ColorTokens.textSecondary, size: 20),
-                onPressed: () => setState(() => _reps = (_reps + 1).clamp(1, 50)),
+                icon: Icon(
+                  TablerIcons.minus,
+                  color: ColorTokens.textSecondary,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _reps = (_reps - 1).clamp(1, 50)),
+              ),
+              Text(
+                '$_reps',
+                style: TextStyle(
+                  color: ColorTokens.accent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  TablerIcons.plus,
+                  color: ColorTokens.textSecondary,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _reps = (_reps + 1).clamp(1, 50)),
               ),
             ],
           ),
@@ -804,13 +1026,26 @@ class _ExerciseEditDialogState extends State<_ExerciseEditDialog> {
           // Rest
           Row(
             children: [
-              const Icon(TablerIcons.clock_pause, color: ColorTokens.accent, size: 20),
+              Icon(
+                TablerIcons.clock_pause,
+                color: ColorTokens.accent,
+                size: 20,
+              ),
               const SizedBox(width: 12),
-              Expanded(child: Text('Rest', style: const TextStyle(color: ColorTokens.textPrimary))),
+              Expanded(
+                child: Text(
+                  'Rest',
+                  style: TextStyle(color: ColorTokens.textPrimary),
+                ),
+              ),
               DropdownButton<String>(
                 value: _rest,
                 dropdownColor: ColorTokens.background,
-                style: const TextStyle(color: ColorTokens.accent, fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(
+                  color: ColorTokens.accent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
                 items: ['15s', '30s', '45s', '60s', '90s'].map((value) {
                   return DropdownMenuItem(value: value, child: Text(value));
                 }).toList(),
@@ -823,7 +1058,10 @@ class _ExerciseEditDialogState extends State<_ExerciseEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: ColorTokens.textSecondary),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -836,9 +1074,17 @@ class _ExerciseEditDialogState extends State<_ExerciseEditDialog> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: ColorTokens.accent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-          child: const Text('Save', style: TextStyle(color: ColorTokens.background, fontWeight: FontWeight.bold)),
+          child: Text(
+            'Save',
+            style: TextStyle(
+              color: ColorTokens.background,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ],
     );

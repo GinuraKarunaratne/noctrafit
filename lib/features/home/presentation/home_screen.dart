@@ -37,21 +37,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final trending = sets.where((s) => s.source == 'seed').take(3).toList();
 
-    if (mounted) {
-      setState(() {
-        _showBanner = showBanner;
-        _trendingWorkouts = trending;
-        _isLoading = false;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _showBanner = showBanner;
+      _trendingWorkouts = trending;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _dismissBanner() async {
+    await ref
+        .read(preferencesRepositoryProvider)
+        .setBool('show_home_banner', false);
+    if (!mounted) return;
+    setState(() => _showBanner = false);
+  }
+
+  void _openTrendingTop() {
+    if (_trendingWorkouts.isEmpty) return;
+    context.push('/plans/details/${_trendingWorkouts.first.uuid}');
   }
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppColorTokens>()!;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('NoctraFit'),
-      ),
+      appBar: AppBar(title: const Text('NoctraFit')),
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() => _isLoading = true);
@@ -63,100 +75,156 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ref.invalidate(weeklyCompletionProvider);
         },
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_showBanner)
-              AdaptiveBannerCard.timeAware(
-                onTap: () {
-                  if (_trendingWorkouts.isNotEmpty) {
-                    context.push('/plans/details/${_trendingWorkouts.first.uuid}');
-                  }
-                },
-                onDismiss: () async {
-                  await ref.read(preferencesRepositoryProvider).setBool('show_home_banner', false);
-                  setState(() => _showBanner = false);
-                },
-              ),
-
-            const SizedBox(height: 8),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'This Week',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: ColorTokens.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ),
-
-            Consumer(
-              builder: (context, ref, child) {
-                final weeklyStatsAsync = ref.watch(weeklyStatsProvider);
-                return weeklyStatsAsync.when(
-                  data: (stats) => StatsGrid(stats: stats),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const SizedBox.shrink(),
-                );
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Trending Workouts',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: ColorTokens.textPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_showBanner)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: _DismissableBannerWrapper(
+                    onTap: _openTrendingTop,
+                    onDismiss: _dismissBanner,
+                    child: AdaptiveBannerCard.timeAware(),
                   ),
-                  TextButton(
-                    onPressed: () => context.go('/plans'),
-                    child: const Text('See All'),
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 12),
 
-            if (_isLoading)
-              const Center(child: Padding(
-                padding: EdgeInsets.all(32),
-                child: CircularProgressIndicator(),
-              ))
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _trendingWorkouts.length,
-                itemBuilder: (context, index) {
-                  final workout = _trendingWorkouts[index];
-                  return _WorkoutCard(
-                    name: workout.name,
-                    duration: '${workout.estimatedMinutes} min',
-                    difficulty: workout.difficulty,
-                    onTap: () => context.push('/plans/details/${workout.uuid}'),
+                child: Text(
+                  'This Week',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+
+              Consumer(
+                builder: (context, ref, child) {
+                  final weeklyStatsAsync = ref.watch(weeklyStatsProvider);
+                  return weeklyStatsAsync.when(
+                    data: (stats) => StatsGrid(stats: stats),
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
                   );
                 },
               ),
 
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 12),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Trending Workouts',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: tokens.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/plans'),
+                      child: const Text('See All'),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _trendingWorkouts.length,
+                  itemBuilder: (context, index) {
+                    final workout = _trendingWorkouts[index];
+                    return _WorkoutCard(
+                      name: workout.name,
+                      duration: '${workout.estimatedMinutes} min',
+                      difficulty: workout.difficulty,
+                      onTap: () =>
+                          context.push('/plans/details/${workout.uuid}'),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
+}
 
+class _DismissableBannerWrapper extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  const _DismissableBannerWrapper({
+    required this.child,
+    required this.onTap,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppColorTokens>()!;
+
+    return Stack(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: child,
+          ),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: onDismiss,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: tokens.surface.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: tokens.border),
+                ),
+                child: Icon(
+                  TablerIcons.x,
+                  size: 16,
+                  color: tokens.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _WorkoutCard extends StatelessWidget {
@@ -175,16 +243,14 @@ class _WorkoutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = Theme.of(context).extension<AppColorTokens>()!;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: ColorTokens.surface,
+        color: tokens.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: ColorTokens.border,
-          width: 1,
-        ),
+        border: Border.all(color: tokens.border, width: 1),
       ),
       child: InkWell(
         onTap: onTap,
@@ -196,18 +262,12 @@ class _WorkoutCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: ColorTokens.accent.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  color: tokens.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  TablerIcons.barbell,
-                  color: ColorTokens.accent,
-                  size: 24,
-                ),
+                child: Icon(TablerIcons.heart, color: tokens.accent, size: 18),
               ),
-
-              const SizedBox(width: 16),
-
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,7 +275,7 @@ class _WorkoutCard extends StatelessWidget {
                     Text(
                       name,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: ColorTokens.textPrimary,
+                        color: tokens.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -224,16 +284,16 @@ class _WorkoutCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           TablerIcons.clock,
                           size: 12,
-                          color: ColorTokens.textSecondary,
+                          color: tokens.textSecondary,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           duration,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: ColorTokens.textSecondary,
+                            color: tokens.textSecondary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -243,13 +303,16 @@ class _WorkoutCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: _getDifficultyColor(difficulty).withOpacity(0.2),
+                            color: _getDifficultyColor(
+                              difficulty,
+                              tokens,
+                            ).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             difficulty,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: _getDifficultyColor(difficulty),
+                              color: _getDifficultyColor(difficulty, tokens),
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -260,10 +323,9 @@ class _WorkoutCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              const Icon(
+              Icon(
                 TablerIcons.chevron_right,
-                color: ColorTokens.textSecondary,
+                color: tokens.textSecondary,
                 size: 20,
               ),
             ],
@@ -273,16 +335,16 @@ class _WorkoutCard extends StatelessWidget {
     );
   }
 
-  Color _getDifficultyColor(String difficulty) {
+  static Color _getDifficultyColor(String difficulty, AppColorTokens tokens) {
     switch (difficulty.toLowerCase()) {
       case 'beginner':
-        return ColorTokens.success;
+        return tokens.success;
       case 'intermediate':
-        return ColorTokens.warning;
+        return tokens.warning;
       case 'advanced':
-        return ColorTokens.error;
+        return tokens.error;
       default:
-        return ColorTokens.textSecondary;
+        return tokens.textSecondary;
     }
   }
 }

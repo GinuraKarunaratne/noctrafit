@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'color_tokens.dart';
 
 /// Accessibility theme modes
 enum AccessibilityMode {
@@ -32,28 +31,28 @@ class AccessibilityPalettes {
 
   // ========== Default Night Palette ==========
   static const AccessibilityPalette _defaultNightPalette = AccessibilityPalette(
-    background: ColorTokens.background,
-    surface: ColorTokens.surface,
-    border: ColorTokens.border,
-    textPrimary: ColorTokens.textPrimary,
-    textSecondary: ColorTokens.textSecondary,
-    iconMuted: ColorTokens.iconMuted,
-    accent: ColorTokens.accent,
-    success: ColorTokens.success,
-    warning: ColorTokens.warning,
-    error: ColorTokens.error,
-    info: ColorTokens.info,
+    background: Color(0xFF0B0D10),
+    surface: Color(0xFF12151B),
+    border: Color(0xFF1B202A),
+    textPrimary: Color(0xFFE8EDF5),
+    textSecondary: Color(0xFF9AA4B2),
+    iconMuted: Color(0xFF6F7886),
+    accent: Color(0xFFC6FF3D),
+    success: Color(0xFF10B981),
+    warning: Color(0xFFF59E0B),
+    error: Color(0xFFEF4444),
+    info: Color(0xFF06B6D4),
   );
 
   // ========== Deuteranopia (Red-Green Color Blind) ==========
   /// Adjusted palette for deuteranopia (6-8% of males, ~0.5% of females)
   static const AccessibilityPalette _deuteranopiaPalette = AccessibilityPalette(
-    background: ColorTokens.background,
-    surface: ColorTokens.surface,
-    border: ColorTokens.border,
-    textPrimary: ColorTokens.textPrimary,
-    textSecondary: ColorTokens.textSecondary,
-    iconMuted: ColorTokens.iconMuted,
+    background: Color(0xFF0B0D10),
+    surface: Color(0xFF12151B),
+    border: Color(0xFF1B202A),
+    textPrimary: Color(0xFFE8EDF5),
+    textSecondary: Color(0xFF9AA4B2),
+    iconMuted: Color(0xFF6F7886),
     accent: Color(0xFFFFD700), // Gold instead of green
     success: Color(0xFF60A5FA), // Blue instead of green
     warning: Color(0xFFFB923C), // Orange (works for most)
@@ -64,12 +63,12 @@ class AccessibilityPalettes {
   // ========== Protanopia (Red-Green Color Blind - Variant) ==========
   /// Adjusted palette for protanopia (1-2% of males)
   static const AccessibilityPalette _protanopiaPalette = AccessibilityPalette(
-    background: ColorTokens.background,
-    surface: ColorTokens.surface,
-    border: ColorTokens.border,
-    textPrimary: ColorTokens.textPrimary,
-    textSecondary: ColorTokens.textSecondary,
-    iconMuted: ColorTokens.iconMuted,
+    background: Color(0xFF0B0D10),
+    surface: Color(0xFF12151B),
+    border: Color(0xFF1B202A),
+    textPrimary: Color(0xFFE8EDF5),
+    textSecondary: Color(0xFF9AA4B2),
+    iconMuted: Color(0xFF6F7886),
     accent: Color(0xFFFFD700), // Gold instead of green
     success: Color(0xFF3B82F6), // Blue instead of green
     warning: Color(0xFFFBBF24), // Yellow
@@ -80,12 +79,12 @@ class AccessibilityPalettes {
   // ========== Tritanopia (Blue-Yellow Color Blind) ==========
   /// Adjusted palette for tritanopia (0.01% of population)
   static const AccessibilityPalette _tritanopiaPalette = AccessibilityPalette(
-    background: ColorTokens.background,
-    surface: ColorTokens.surface,
-    border: ColorTokens.border,
-    textPrimary: ColorTokens.textPrimary,
-    textSecondary: ColorTokens.textSecondary,
-    iconMuted: ColorTokens.iconMuted,
+    background: Color(0xFF0B0D10),
+    surface: Color(0xFF12151B),
+    border: Color(0xFF1B202A),
+    textPrimary: Color(0xFFE8EDF5),
+    textSecondary: Color(0xFF9AA4B2),
+    iconMuted: Color(0xFF6F7886),
     accent: Color(0xFFFF6B9D), // Pink instead of green
     success: Color(0xFF34D399), // Aqua green (distinguishable)
     warning: Color(0xFFFF4444), // Red instead of yellow/orange

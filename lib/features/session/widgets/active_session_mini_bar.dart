@@ -5,7 +5,6 @@ import 'dart:async';
 import 'package:noctrafit/app/providers/session_provider.dart';
 import 'package:noctrafit/app/theme/color_tokens.dart';
 
-
 /// CW5: Active Session Mini Bar - Global floating bar
 ///
 /// Features:
@@ -20,7 +19,8 @@ class ActiveSessionMiniBar extends ConsumerStatefulWidget {
   const ActiveSessionMiniBar({super.key});
 
   @override
-  ConsumerState<ActiveSessionMiniBar> createState() => _ActiveSessionMiniBarState();
+  ConsumerState<ActiveSessionMiniBar> createState() =>
+      _ActiveSessionMiniBarState();
 }
 
 class _ActiveSessionMiniBarState extends ConsumerState<ActiveSessionMiniBar>
@@ -99,7 +99,10 @@ class _ActiveSessionMiniBarState extends ConsumerState<ActiveSessionMiniBar>
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       // Pulsing indicator
@@ -136,7 +139,7 @@ class _ActiveSessionMiniBarState extends ConsumerState<ActiveSessionMiniBar>
                           children: [
                             Text(
                               activeSession.workoutSetName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: ColorTokens.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -147,7 +150,7 @@ class _ActiveSessionMiniBarState extends ConsumerState<ActiveSessionMiniBar>
                             const SizedBox(height: 2),
                             Text(
                               _formatElapsed(elapsed),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: ColorTokens.accent,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -158,7 +161,7 @@ class _ActiveSessionMiniBarState extends ConsumerState<ActiveSessionMiniBar>
                       ),
 
                       // Arrow icon
-                      const Icon(
+                      Icon(
                         Icons.arrow_forward_ios,
                         color: ColorTokens.accent,
                         size: 14,

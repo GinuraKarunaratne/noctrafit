@@ -134,7 +134,7 @@ class _CategoryBreakdown extends ConsumerWidget {
     return categoryBreakdownAsync.when(
       data: (categories) {
         if (categories.isEmpty) {
-          return const Padding(
+          return  Padding(
             padding: EdgeInsets.all(16),
             child: Center(
               child: Text(

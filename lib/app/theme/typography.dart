@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import 'color_tokens.dart';
 
 /// Typography system for NoctraFit
@@ -51,7 +52,7 @@ class AppTypography {
         letterSpacing: 0.0,
       ),
 
-      // ========== Title Styles (Space Grotesk for titles) ==========
+      // ========== Title Styles ==========
       titleLarge: GoogleFonts.spaceGrotesk(
         fontSize: 18,
         fontWeight: FontWeight.w600,

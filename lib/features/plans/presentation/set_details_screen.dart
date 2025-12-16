@@ -250,7 +250,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             pinned: true,
             backgroundColor: ColorTokens.background,
             leading: IconButton(
-              icon: const Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
+              icon:  Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
@@ -412,12 +412,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   onPressed: _addToCalendar,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: ColorTokens.accent),
+                    side:  BorderSide(color: ColorTokens.accent),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
+                  child:  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(TablerIcons.calendar_plus, color: ColorTokens.accent),
@@ -445,7 +445,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
+                  child:  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(TablerIcons.player_play, color: ColorTokens.background),
@@ -734,7 +734,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
                 color: ColorTokens.accent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(TablerIcons.calendar, color: ColorTokens.accent),
+              child:  Icon(TablerIcons.calendar, color: ColorTokens.accent),
             ),
             title: Text(
               'Date',
@@ -769,7 +769,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
                 color: ColorTokens.accent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(TablerIcons.clock, color: ColorTokens.accent),
+              child:  Icon(TablerIcons.clock, color: ColorTokens.accent),
             ),
             title: Text(
               'Time',
@@ -817,7 +817,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text(
+          child:  Text(
             'Cancel',
             style: TextStyle(color: ColorTokens.textSecondary),
           ),
@@ -836,7 +836,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: const Text(
+          child:  Text(
             'Schedule',
             style: TextStyle(
               color: ColorTokens.background,

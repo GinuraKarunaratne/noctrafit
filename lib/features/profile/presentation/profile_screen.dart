@@ -69,7 +69,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         width: 2,
                       ),
                     ),
-                    child: const Icon(
+                    child:  Icon(
                       TablerIcons.user,
                       size: 40,
                       color: ColorTokens.accent,
@@ -262,7 +262,7 @@ class _AchievementCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+           Icon(
             TablerIcons.check,
             color: ColorTokens.success,
             size: 20,

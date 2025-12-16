@@ -213,7 +213,7 @@ class _FilterChip extends StatelessWidget {
       onDeleted: onRemove,
       backgroundColor: ColorTokens.accent.withOpacity(0.2),
       deleteIconColor: ColorTokens.accent,
-      labelStyle: const TextStyle(
+      labelStyle:  TextStyle(
         color: ColorTokens.accent,
         fontWeight: FontWeight.w600,
       ),
@@ -682,7 +682,7 @@ class _SortMenu extends StatelessWidget {
                 ),
               ),
               trailing: isSelected
-                  ? const Icon(TablerIcons.check, color: ColorTokens.accent)
+                  ?  Icon(TablerIcons.check, color: ColorTokens.accent)
                   : null,
               onTap: () => onSelect(option['value'] as String),
             );

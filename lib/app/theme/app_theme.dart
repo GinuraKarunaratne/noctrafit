@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'accessibility_palettes.dart';
 import 'color_tokens.dart';
 import 'typography.dart';
@@ -12,9 +13,31 @@ class AppTheme {
   /// Get ThemeData for a specific accessibility mode
   static ThemeData getTheme(AccessibilityMode mode) {
     final palette = AccessibilityPalettes.getPalette(mode);
+
+    // Ensure the current token façade is updated BEFORE typography is built,
+    // since typography uses ColorTokens.* colors.
+    final appTokens = AppColorTokens(
+      background: palette.background,
+      surface: palette.surface,
+      border: palette.border,
+      textPrimary: palette.textPrimary,
+      textSecondary: palette.textSecondary,
+      iconMuted: palette.iconMuted,
+      accent: palette.accent,
+      success: palette.success,
+      warning: palette.warning,
+      error: palette.error,
+      info: palette.info,
+    );
+
+    // Public method (not library-private) so this file can call it.
+    ColorTokens.setFromAppTokens(appTokens);
+
     final textTheme = AppTypography.getTextTheme();
 
     return ThemeData(
+      extensions: <ThemeExtension<dynamic>>[appTokens],
+
       // ========== Basics ==========
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -63,10 +86,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: palette.border,
-            width: 1,
-          ),
+          side: BorderSide(color: palette.border, width: 1),
         ),
         margin: const EdgeInsets.all(8),
       ),
@@ -101,9 +121,7 @@ class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: palette.accent,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: AppTypography.button,
         ),
       ),
@@ -119,7 +137,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: palette.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: palette.border, width: 1),
@@ -140,9 +161,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: palette.error, width: 2),
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(
-          color: palette.textSecondary,
-        ),
+        hintStyle: textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
         labelStyle: textTheme.bodyMedium?.copyWith(
           color: palette.textSecondary,
         ),
@@ -202,9 +221,7 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: palette.surface,
         elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         titleTextStyle: textTheme.titleLarge,
         contentTextStyle: textTheme.bodyMedium,
       ),
@@ -213,9 +230,7 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: palette.surface.lighten(10),
         contentTextStyle: textTheme.bodyMedium,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         behavior: SnackBarBehavior.floating,
         actionTextColor: palette.accent,
       ),
@@ -291,14 +306,8 @@ class AppTheme {
       ),
 
       // ========== Icon Theme ==========
-      iconTheme: IconThemeData(
-        color: palette.iconMuted,
-        size: 24,
-      ),
-      primaryIconTheme: IconThemeData(
-        color: palette.accent,
-        size: 24,
-      ),
+      iconTheme: IconThemeData(color: palette.iconMuted, size: 24),
+      primaryIconTheme: IconThemeData(color: palette.accent, size: 24),
     );
   }
 }

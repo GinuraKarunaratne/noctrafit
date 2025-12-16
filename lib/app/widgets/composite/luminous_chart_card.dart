@@ -33,16 +33,14 @@ class LuminousChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = Theme.of(context).extension<AppColorTokens>()!;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: ColorTokens.surface,
+        color: tokens.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: ColorTokens.border,
-          width: 1,
-        ),
+        border: Border.all(color: tokens.border, width: 1),
       ),
       child: InkWell(
         onTap: onTap,
@@ -63,7 +61,7 @@ class LuminousChartCard extends StatelessWidget {
                         Text(
                           title,
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: ColorTokens.textPrimary,
+                            color: tokens.textPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -72,7 +70,7 @@ class LuminousChartCard extends StatelessWidget {
                           Text(
                             subtitle!,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: ColorTokens.textSecondary,
+                              color: tokens.textSecondary,
                             ),
                           ),
                         ],
@@ -82,7 +80,7 @@ class LuminousChartCard extends StatelessWidget {
                   if (onTap != null)
                     Icon(
                       Icons.arrow_forward_ios,
-                      color: ColorTokens.accent,
+                      color: tokens.accent,
                       size: 16,
                     ),
                 ],
@@ -104,7 +102,7 @@ class LuminousChartCard extends StatelessWidget {
                 Text(
                   footerText!,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: ColorTokens.textSecondary,
+                    color: tokens.textSecondary,
                   ),
                 ),
               ],
@@ -124,6 +122,7 @@ class _LineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppColorTokens>()!;
     return LineChart(
       LineChartData(
         gridData: FlGridData(
@@ -131,10 +130,7 @@ class _LineChart extends StatelessWidget {
           drawVerticalLine: false,
           horizontalInterval: 1,
           getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: ColorTokens.border,
-              strokeWidth: 1,
-            );
+            return FlLine(color: tokens.border, strokeWidth: 1);
           },
         ),
         titlesData: FlTitlesData(
@@ -156,10 +152,7 @@ class _LineChart extends StatelessWidget {
                 }
                 return Text(
                   data[index].label,
-                  style: const TextStyle(
-                    color: ColorTokens.textSecondary,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 10),
                 );
               },
             ),
@@ -171,10 +164,7 @@ class _LineChart extends StatelessWidget {
               getTitlesWidget: (value, meta) {
                 return Text(
                   value.toInt().toString(),
-                  style: const TextStyle(
-                    color: ColorTokens.textSecondary,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 10),
                 );
               },
             ),
@@ -189,7 +179,7 @@ class _LineChart extends StatelessWidget {
                 .map((e) => FlSpot(e.key.toDouble(), e.value.value))
                 .toList(),
             isCurved: true,
-            color: ColorTokens.accent,
+            color: tokens.accent,
             barWidth: 3,
             isStrokeCapRound: true,
             dotData: FlDotData(
@@ -197,15 +187,15 @@ class _LineChart extends StatelessWidget {
               getDotPainter: (spot, percent, barData, index) {
                 return FlDotCirclePainter(
                   radius: 4,
-                  color: ColorTokens.accent,
+                  color: tokens.accent,
                   strokeWidth: 2,
-                  strokeColor: ColorTokens.background,
+                  strokeColor: tokens.background,
                 );
               },
             ),
             belowBarData: BarAreaData(
               show: true,
-              color: ColorTokens.accent.withOpacity(0.1),
+              color: tokens.accent.withOpacity(0.1),
             ),
           ),
         ],
@@ -222,6 +212,7 @@ class _BarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppColorTokens>()!;
     return BarChart(
       BarChartData(
         gridData: FlGridData(
@@ -229,10 +220,7 @@ class _BarChart extends StatelessWidget {
           drawVerticalLine: false,
           horizontalInterval: 1,
           getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: ColorTokens.border,
-              strokeWidth: 1,
-            );
+            return FlLine(color: tokens.border, strokeWidth: 1);
           },
         ),
         titlesData: FlTitlesData(
@@ -254,10 +242,7 @@ class _BarChart extends StatelessWidget {
                 }
                 return Text(
                   data[index].label,
-                  style: const TextStyle(
-                    color: ColorTokens.textSecondary,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 10),
                 );
               },
             ),
@@ -269,10 +254,7 @@ class _BarChart extends StatelessWidget {
               getTitlesWidget: (value, meta) {
                 return Text(
                   value.toInt().toString(),
-                  style: const TextStyle(
-                    color: ColorTokens.textSecondary,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 10),
                 );
               },
             ),
@@ -288,7 +270,7 @@ class _BarChart extends StatelessWidget {
                 barRods: [
                   BarChartRodData(
                     toY: e.value.value,
-                    color: ColorTokens.accent,
+                    color: tokens.accent,
                     width: 16,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(4),
@@ -308,14 +290,8 @@ class ChartDataPoint {
   final double value;
   final String label;
 
-  const ChartDataPoint({
-    required this.value,
-    required this.label,
-  });
+  const ChartDataPoint({required this.value, required this.label});
 }
 
 /// Chart type enum
-enum ChartType {
-  line,
-  bar,
-}
+enum ChartType { line, bar }
