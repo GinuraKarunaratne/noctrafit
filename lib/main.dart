@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:logger/logger.dart';
 
 import 'app/app.dart';
+import 'core/services/notification_service.dart';
 import 'data/local/db/app_database.dart';
 import 'data/local/seed/seed_loader.dart';
 
@@ -22,6 +23,14 @@ void main() async {
   } catch (e) {
     // Firebase initialization might fail if config missing - OK for development
     logger.w('Firebase initialization failed (OK for offline development)', error: e);
+  }
+
+  // Initialize notification service
+  try {
+    await NotificationService.initialize();
+    logger.i('Notification service initialized');
+  } catch (e) {
+    logger.w('Notification initialization failed', error: e);
   }
 
   // Initialize database (local-first)

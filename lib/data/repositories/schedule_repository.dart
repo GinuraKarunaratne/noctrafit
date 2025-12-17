@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/services/notification_service.dart';
 import '../local/db/app_database.dart';
 import '../local/db/daos/schedule_dao.dart';
 import '../remote/firestore/user_remote_datasource.dart';
@@ -41,6 +42,7 @@ class ScheduleRepository {
     required DateTime scheduledDate,
     required String timeOfDay,
     String? note,
+    String? workoutName,
   }) async {
     final now = DateTime.now();
     final entryUuid = DateTime.now().millisecondsSinceEpoch.toString();
@@ -76,6 +78,18 @@ class ScheduleRepository {
       } catch (e) {
         // Log error but don't fail the schedule creation
       }
+    }
+
+    // Schedule notifications for this workout
+    try {
+      await NotificationService.scheduleWorkoutReminders(
+        scheduleEntryId: id,
+        workoutName: workoutName ?? 'Your Workout',
+        scheduledDateTime: scheduledDate,
+      );
+    } catch (e) {
+      // Log but don't fail - notifications are optional
+      print('Failed to schedule notifications: $e');
     }
 
     return id;

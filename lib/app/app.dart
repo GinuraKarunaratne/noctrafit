@@ -6,6 +6,8 @@ import 'router/app_router.dart';
 import 'providers/service_providers.dart';
 import 'providers/repository_providers.dart';
 import 'providers/accessibility_provider.dart';
+import 'providers/notification_providers.dart';
+import '../core/services/notification_service.dart';
 import '../data/local/db/app_database.dart';
 
 /// Main application widget
@@ -27,6 +29,7 @@ class _NoctraFitAppState extends ConsumerState<NoctraFitApp> {
   void initState() {
     super.initState();
     _initializeTts();
+    _requestNotificationPermission();
   }
 
   Future<void> _initializeTts() async {
@@ -36,6 +39,13 @@ class _NoctraFitAppState extends ConsumerState<NoctraFitApp> {
 
     final tts = ref.read(ttsServiceProvider);
     await tts.initialize(enabled: enabled, rate: rate);
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final hasPermission = await NotificationService.requestPermission();
+    if (hasPermission && mounted) {
+      // Show confirmation or just proceed silently
+    }
   }
 
   @override

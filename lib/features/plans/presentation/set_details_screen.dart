@@ -212,6 +212,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         scheduledDate: date,
         timeOfDay: timeString, // ✅ was: result['time']
         note: note,
+        workoutName: _workoutSet!.name,
       );
 
       if (mounted) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/repository_providers.dart';
@@ -69,14 +70,44 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         });
       }
     } catch (e) {
-      // Error loading schedule - show empty state instead of crashing
+      // Error handling
       if (mounted) {
-        setState(() {
-          _scheduleEntries = [];
-          _workoutSetsCache = {};
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
+    }
+  }
+
+  /// Start a scheduled workout immediately
+  Future<void> _startWorkout(WorkoutSet workoutSet) async {
+    await ref.read(sessionRepositoryProvider).startSession(
+      workoutSetId: workoutSet.id,
+      workoutSetName: workoutSet.name,
+      workoutSetUuid: workoutSet.uuid,
+      totalExercises: workoutSet.exercises != null
+          ? (workoutSet.exercises as List).length
+          : 0,
+      estimatedMinutes: workoutSet.estimatedMinutes,
+    );
+
+    final session = await ref.read(sessionRepositoryProvider).getActiveSession();
+    if (session != null && mounted) {
+      // Navigate to active session
+      context.go('/session/${session.sessionUuid}');
+    }
+  }
+
+  /// Mark a scheduled workout as complete
+  Future<void> _markWorkoutComplete(int scheduleEntryId) async {
+    await ref.read(scheduleRepositoryProvider).markAsCompleted(scheduleEntryId);
+    await _loadScheduleEntries();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Workout marked as complete!'),
+          backgroundColor: ColorTokens.success,
+        ),
+      );
     }
   }
 
@@ -155,6 +186,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       final workoutSet = _workoutSetsCache[entry.workoutSetId];
 
                       return _ScheduledWorkoutCard(
+                        scheduleEntryId: entry.id,
+                        workoutSetId: workoutSet?.id,
                         name: workoutSet?.name ?? 'Unknown Workout',
                         time: entry.timeOfDay,
                         duration: workoutSet != null
@@ -162,6 +195,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                             : '-',
                         isCompleted: entry.isCompleted,
                         onTap: () {},
+                        onStart: workoutSet != null && !entry.isCompleted
+                            ? () => _startWorkout(workoutSet)
+                            : null,
+                        onMarkComplete: () => _markWorkoutComplete(entry.id),
                       );
                     },
                   ),
@@ -250,18 +287,26 @@ class _WeekView extends StatelessWidget {
 }
 
 class _ScheduledWorkoutCard extends StatelessWidget {
+  final int scheduleEntryId;
+  final int? workoutSetId;
   final String name;
   final String time;
   final String duration;
   final bool isCompleted;
   final VoidCallback onTap;
+  final VoidCallback? onStart;
+  final VoidCallback? onMarkComplete;
 
   const _ScheduledWorkoutCard({
+    required this.scheduleEntryId,
+    required this.workoutSetId,
     required this.name,
     required this.time,
     required this.duration,
     required this.isCompleted,
     required this.onTap,
+    this.onStart,
+    this.onMarkComplete,
   });
 
   @override
@@ -271,71 +316,102 @@ class _ScheduledWorkoutCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: tokens.surface,
+        color: isCompleted
+            ? tokens.success.withOpacity(0.1)
+            : tokens.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isCompleted ? tokens.success : tokens.border,
           width: isCompleted ? 2 : 1,
         ),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Column(
-                children: [
-                  Icon(
-                    TablerIcons.clock,
-                    size: 20,
-                    color: isCompleted ? tokens.success : tokens.accent,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    time,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: isCompleted ? tokens.success : tokens.accent,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Column(
                   children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        decoration: isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
+                    Icon(
+                      TablerIcons.clock,
+                      size: 20,
+                      color: isCompleted ? tokens.success : tokens.accent,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      duration,
+                      time,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: tokens.textSecondary,
+                        color: isCompleted ? tokens.success : tokens.accent,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Icon(
-                isCompleted
-                    ? TablerIcons.circle_check_filled
-                    : TablerIcons.play_card,
-                color: isCompleted ? tokens.success : tokens.accent,
-                size: 24,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: tokens.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          decoration: isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        duration,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: tokens.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  isCompleted
+                      ? TablerIcons.circle_check_filled
+                      : TablerIcons.play_card,
+                  color: isCompleted ? tokens.success : tokens.accent,
+                  size: 24,
+                ),
+              ],
+            ),
+            // Action buttons for non-completed workouts
+            if (!isCompleted && onStart != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onStart,
+                      icon: Icon(TablerIcons.player_play, size: 18),
+                      label: Text('Start Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: tokens.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: onMarkComplete,
+                    icon: Icon(TablerIcons.check, size: 18),
+                    label: Text('Done'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: tokens.success),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
