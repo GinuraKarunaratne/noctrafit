@@ -43,22 +43,40 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final scheduleRepo = ref.read(scheduleRepositoryProvider);
     final setsRepo = ref.read(setsRepositoryProvider);
 
-    // Load schedule entries for selected date
-    final entries = await scheduleRepo.getEntriesForDate(_selectedDate);
+    try {
+      // Load schedule entries for selected date
+      final entries = await scheduleRepo.getEntriesForDate(_selectedDate);
 
-    // Load workout sets for all entries
-    final allSets = await setsRepo.getAllSets();
-    final setsCache = <int, WorkoutSet>{};
-    for (final set in allSets) {
-      setsCache[set.id] = set;
-    }
+      // Load workout sets for all entries - with fallback
+      List<WorkoutSet> allSets;
+      try {
+        allSets = await setsRepo.getAllSets();
+      } catch (e) {
+        // Fallback: use empty list if offline (prevents null crash)
+        allSets = [];
+      }
 
-    if (mounted) {
-      setState(() {
-        _scheduleEntries = entries;
-        _workoutSetsCache = setsCache;
-        _isLoading = false;
-      });
+      final setsCache = <int, WorkoutSet>{};
+      for (final set in allSets) {
+        setsCache[set.id] = set;
+      }
+
+      if (mounted) {
+        setState(() {
+          _scheduleEntries = entries;
+          _workoutSetsCache = setsCache;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Error loading schedule - show empty state instead of crashing
+      if (mounted) {
+        setState(() {
+          _scheduleEntries = [];
+          _workoutSetsCache = {};
+          _isLoading = false;
+        });
+      }
     }
   }
 

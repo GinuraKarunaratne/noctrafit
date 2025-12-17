@@ -39,6 +39,12 @@ class InsightsRepository {
   // Aggregated stats
   Future<int> getTotalWorkouts() => _dao.countLogs();
 
+  Future<int> getTotalWorkoutsRemote(String userId) async {
+    if (_remote == null) return getTotalWorkouts();
+    final docs = await _remote.fetchCompletionLogs(userId: userId);
+    return docs.length;
+  }
+
   Future<int> getWorkoutsThisWeek() async {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));

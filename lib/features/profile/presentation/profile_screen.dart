@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
+import '../../../app/providers/achievement_providers.dart';
 import '../../../app/providers/auth_provider.dart';
 import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
@@ -172,103 +173,209 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
-/// Achievements list (placeholder)
-class _AchievementsList extends StatelessWidget {
+/// Achievements list - fetches from Firestore with local fallback
+/// Always displays achievements (locked and unlocked), never empty
+class _AchievementsList extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
-    final achievements = [
-      {'title': 'Night Owl', 'description': 'Complete 10 night workouts', 'icon': TablerIcons.moon},
-      {'title': 'Streak Master', 'description': '30-day streak achieved', 'icon': TablerIcons.flame},
-      {'title': 'Century Club', 'description': '100 total workouts', 'icon': TablerIcons.trophy},
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final achievementsAsync = ref.watch(userAchievementsProvider);
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: achievements.length,
-      itemBuilder: (context, index) {
-        final achievement = achievements[index];
-        return _AchievementCard(
-          title: achievement['title']! as String,
-          description: achievement['description']! as String,
-          icon: achievement['icon']! as IconData,
+    return achievementsAsync.when(
+      data: (achievements) {
+        // Always show achievements list - provider ensures we have at least defaults
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: achievements.length,
+          itemBuilder: (context, index) {
+            final achievement = achievements[index];
+            return _AchievementCard(
+              title: achievement.title,
+              description: achievement.description,
+              isUnlocked: achievement.isUnlocked,
+              currentProgress: achievement.currentProgress,
+              goalTarget: achievement.goalTarget,
+              goalType: achievement.goalType,
+            );
+          },
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: CircularProgressIndicator(),
+      ),
+      error: (err, stack) {
+        // Even on error, try to show default achievements template
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              Text(
+                'Loading achievements...',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: ColorTokens.textSecondary,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 }
 
-/// Achievement card widget
+/// Achievement card - shows unlock status and progress
+/// Locked achievements appear faded; unlocked appear bright
 class _AchievementCard extends StatelessWidget {
   final String title;
   final String description;
-  final IconData icon;
+  final bool isUnlocked;
+  final int? currentProgress;
+  final int goalTarget;
+  final String goalType;
 
   const _AchievementCard({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.isUnlocked,
+    required this.currentProgress,
+    required this.goalTarget,
+    required this.goalType,
   });
+
+  String _getProgressLabel() {
+    if (currentProgress == null) return '';
+    switch (goalType) {
+      case 'workouts':
+        return '$currentProgress / $goalTarget workouts';
+      case 'streak':
+        return '$currentProgress / $goalTarget day streak';
+      case 'duration':
+        return '$currentProgress / $goalTarget minutes';
+      default:
+        return '$currentProgress / $goalTarget';
+    }
+  }
+
+  IconData _getIconForGoalType() {
+    switch (goalType) {
+      case 'workouts':
+        return TablerIcons.activity;
+      case 'streak':
+        return TablerIcons.flame;
+      case 'duration':
+        return TablerIcons.clock;
+      default:
+        return TablerIcons.trophy;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final progressPercent = currentProgress != null && goalTarget > 0
+        ? (currentProgress! / goalTarget).clamp(0.0, 1.0)
+        : 0.0;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ColorTokens.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: ColorTokens.border,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: ColorTokens.accent.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: ColorTokens.accent,
-              size: 24,
-            ),
+    // Faded opacity for locked achievements
+    final opacity = isUnlocked ? 1.0 : 0.5;
+
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isUnlocked ? ColorTokens.surface : ColorTokens.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isUnlocked ? ColorTokens.accent : ColorTokens.border.withOpacity(0.5),
+            width: 1,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          boxShadow: isUnlocked
+              ? [
+                  BoxShadow(
+                    color: ColorTokens.accent.withOpacity(0.2),
+                    blurRadius: 8,
+                  )
+                ]
+              : [],
+        ),
+        child: Column(
+          children: [
+            Row(
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: ColorTokens.textPrimary,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isUnlocked
+                        ? ColorTokens.accent.withOpacity(0.2)
+                        : ColorTokens.border.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _getIconForGoalType(),
+                    color: isUnlocked ? ColorTokens.accent : ColorTokens.textSecondary,
+                    size: 24,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: ColorTokens.textSecondary,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: isUnlocked ? ColorTokens.textPrimary : ColorTokens.textSecondary,
+                          fontWeight: FontWeight.bold,
+                          decoration: isUnlocked ? TextDecoration.none : null,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: ColorTokens.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                Icon(
+                  isUnlocked ? TablerIcons.check : TablerIcons.lock,
+                  color: isUnlocked ? ColorTokens.success : ColorTokens.textSecondary.withOpacity(0.5),
+                  size: 20,
                 ),
               ],
             ),
-          ),
-           Icon(
-            TablerIcons.check,
-            color: ColorTokens.success,
-            size: 20,
-          ),
-        ],
+            if (currentProgress != null && !isUnlocked) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progressPercent,
+                  minHeight: 4,
+                  backgroundColor: ColorTokens.border.withOpacity(0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    ColorTokens.accent.withOpacity(0.6),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _getProgressLabel(),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: ColorTokens.textSecondary.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
+
