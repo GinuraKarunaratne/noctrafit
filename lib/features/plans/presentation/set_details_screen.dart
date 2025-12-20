@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/auth_provider.dart';
+import '../../../app/providers/database_provider.dart';
 import '../../../app/providers/repository_providers.dart';
 import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
@@ -60,6 +61,32 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     return '$hh:$mm';
   }
 
+  // ✅ NEW: decode exercises safely
+  List<Map<String, dynamic>> _safeDecodeExercises(dynamic raw) {
+    try {
+      if (raw == null) return [];
+      if (raw is String) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList();
+        }
+        return [];
+      }
+      if (raw is List) {
+        return raw
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> _loadWorkoutSet() async {
     // Try local DB first
     var set =
@@ -76,6 +103,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           final exercisesStr = exercisesRaw is String
               ? exercisesRaw
               : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
+
           set = WorkoutSet(
             id: 0,
             uuid: widget.workoutSetUuid,
@@ -121,6 +149,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           final exercisesStr = exercisesRaw is String
               ? exercisesRaw
               : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
+
           set = WorkoutSet(
             id: 0,
             uuid: widget.workoutSetUuid,
@@ -154,18 +183,62 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     }
 
     if (set != null && mounted) {
-      List<Map<String, dynamic>> parsedExercises = [];
-      try {
-        final exercisesStr = set.exercises;
-        final exercisesJson = jsonDecode(exercisesStr) as List<dynamic>;
-        parsedExercises = exercisesJson.cast<Map<String, dynamic>>();
-      } catch (_) {
-        parsedExercises = [];
+      // ✅ Parse set exercises (seed/community/user)
+      final parsedExercises = _safeDecodeExercises(set.exercises);
+
+      // ✅ NEW: Resolve exercise_uuid -> Exercise from local exercises table
+      // (keeps UI same, only fills names/details)
+      final db = ref.read(databaseProvider);
+      final allExercises = await db.exercisesDao.getAllExercises();
+      final exByUuid = <String, Exercise>{};
+      for (final e in allExercises) {
+        exByUuid[e.uuid] = e;
+      }
+
+      final resolved = <Map<String, dynamic>>[];
+      for (final item in parsedExercises) {
+        final exUuid =
+            (item['exercise_uuid'] ?? item['exerciseUuid'] ?? item['uuid'])
+                ?.toString();
+
+        final ex = (exUuid == null) ? null : exByUuid[exUuid];
+
+        // normalize rest/duration keys used by your OLD UI
+        final restSec = item['rest_sec'] ?? item['restSec'] ?? item['rest'];
+        final durationSec =
+            item['duration_sec'] ?? item['durationSec'] ?? item['duration'];
+
+        resolved.add({
+          ...item,
+
+          // ✅ keep original key too
+          'exercise_uuid': exUuid ?? item['exercise_uuid'],
+
+          // ✅ the important part (name + details)
+          'name': ex?.name ?? item['name'] ?? 'Unknown exercise',
+          'muscleGroup': ex?.muscleGroup ??
+              item['muscleGroup'] ??
+              item['muscle_group'] ??
+              '',
+          'equipment':
+              ex?.equipment ?? item['equipment'] ?? '',
+
+          // ✅ optional (if you ever show later)
+          'instructions': ex?.instructions ?? item['instructions'] ?? '',
+
+          // ✅ ensure OLD UI fields exist
+          'rest': restSec?.toString(),
+          'duration': durationSec != null
+              ? (durationSec.toString().contains('s')
+                  ? durationSec.toString()
+                  : '${durationSec}s')
+              : null,
+        });
       }
 
       setState(() {
         _workoutSet = set;
-        _exercises = parsedExercises;
+        _exercises = resolved;
       });
     }
   }
@@ -216,39 +289,42 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
   }
 
   Future<void> _addToCalendar() async {
-    if (_workoutSet == null) return;
+  if (_workoutSet == null) return;
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => _AddToCalendarDialog(),
-    );
+  final result = await showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (context) => _AddToCalendarDialog(),
+  );
 
-    if (result != null) {
-      final DateTime date = result['date'] as DateTime;
-      final TimeOfDay time = result['time'] as TimeOfDay;
-      final String timeString = _timeOfDayTo24hString(time);
-      final String? note =
-          (result['note'] as String?)?.trim().isEmpty ?? true ? null : (result['note'] as String?)?.trim();
+  if (result != null) {
+    final DateTime date = result['date'] as DateTime;
+    final TimeOfDay time = result['time'] as TimeOfDay;
+    final String timeString = _timeOfDayTo24hString(time);
 
-      await ref.read(scheduleRepositoryProvider).scheduleWorkout(
-            workoutSetId: _workoutSet!.id,
-            scheduledDate: date,
-            timeOfDay: timeString,
-            note: note,
-            workoutName: _workoutSet!.name,
-          );
+    final String? noteRaw = result['note'] as String?;
+    final String? note =
+        (noteRaw == null || noteRaw.trim().isEmpty) ? null : noteRaw.trim();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Workout scheduled for ${date.toString().split(' ')[0]} at $timeString'),
-            backgroundColor: ColorTokens.success,
-          ),
+    await ref.read(scheduleRepositoryProvider).scheduleWorkout(
+          workoutSetId: _workoutSet!.id,
+          scheduledDate: date,
+          timeOfDay: timeString,
+          note: note,
+          workoutName: _workoutSet!.name,
         );
-      }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Workout scheduled for ${date.toString().split(' ')[0]} at $timeString'),
+          backgroundColor: ColorTokens.success,
+        ),
+      );
     }
   }
+}
+
 
   // ✅ NEW: actually delete from Firestore if it’s a community set you own
   Future<void> _deleteWorkout() async {
@@ -259,13 +335,13 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         user != null &&
         user.uid == _workoutSet!.authorId;
 
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: ColorTokens.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete workout?', style: TextStyle(color: ColorTokens.textPrimary)),
+        title:
+            Text('Delete workout?', style: TextStyle(color: ColorTokens.textPrimary)),
         content: Text(
           isOwnedCommunity
               ? 'This will delete the workout from Community (Firestore) and also remove it locally.'
@@ -291,14 +367,13 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     try {
       // 1) If it's your community set, delete the Firestore doc too
       if (isOwnedCommunity) {
-        // Your publish uses: doc(workoutSet.uuid), so delete by uuid
         await FirebaseFirestore.instance
             .collection('community_sets')
             .doc(_workoutSet!.uuid)
             .delete();
       }
 
-      // 2) Always delete locally (for local user sets and for community cache)
+      // 2) Always delete locally
       await ref.read(setsRepositoryProvider).deleteSet(_workoutSet!.id);
 
       // 3) Force UI refresh
@@ -315,7 +390,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         Navigator.pop(context);
       }
     } on FirebaseException catch (e) {
-      // This usually means rules blocked delete, or you're offline.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -368,12 +442,14 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
               if (canDelete)
                 IconButton(
                   icon: Icon(TablerIcons.trash, color: ColorTokens.error),
-                  onPressed: _deleteWorkout, // ✅ uses new function
+                  onPressed: _deleteWorkout,
                 ),
               IconButton(
                 icon: Icon(
                   _workoutSet!.isFavorite ? TablerIcons.star_filled : TablerIcons.star,
-                  color: _workoutSet!.isFavorite ? ColorTokens.accent : ColorTokens.textPrimary,
+                  color: _workoutSet!.isFavorite
+                      ? ColorTokens.accent
+                      : ColorTokens.textPrimary,
                 ),
                 onPressed: _toggleFavorite,
               ),
@@ -408,9 +484,15 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                         Wrap(
                           spacing: 8,
                           children: [
-                            _InfoChip(icon: TablerIcons.clock, label: '${_workoutSet!.estimatedMinutes} min'),
-                            _InfoChip(icon: TablerIcons.trending_up, label: _capitalize(_workoutSet!.difficulty)),
-                            _InfoChip(icon: TablerIcons.tag, label: _capitalize(_workoutSet!.category)),
+                            _InfoChip(
+                                icon: TablerIcons.clock,
+                                label: '${_workoutSet!.estimatedMinutes} min'),
+                            _InfoChip(
+                                icon: TablerIcons.trending_up,
+                                label: _capitalize(_workoutSet!.difficulty)),
+                            _InfoChip(
+                                icon: TablerIcons.tag,
+                                label: _capitalize(_workoutSet!.category)),
                           ],
                         ),
                       ],
@@ -420,7 +502,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
               ),
             ),
           ),
-
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -445,7 +526,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                     ),
                     const SizedBox(height: 24),
                   ],
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -461,7 +541,8 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: ColorTokens.accent.withOpacity(0.3), width: 1),
+                          border: Border.all(
+                              color: ColorTokens.accent.withOpacity(0.3), width: 1),
                         ),
                         child: Text(
                           '${_exercises.length} exercises',
@@ -473,9 +554,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 12),
-
                   ..._exercises.asMap().entries.map((entry) {
                     final index = entry.key;
                     final exercise = entry.value;
@@ -491,7 +570,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                       equipment: exercise['equipment']?.toString(),
                     );
                   }),
-
                   const SizedBox(height: 100),
                 ],
               ),
@@ -499,7 +577,6 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           ),
         ],
       ),
-
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -816,7 +893,8 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               ),
               child: Icon(TablerIcons.calendar, color: ColorTokens.accent),
             ),
-            title: Text('Date', style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
+            title: Text('Date',
+                style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
             subtitle: Text(
               '${_selectedDate.month}/${_selectedDate.day}/${_selectedDate.year}',
               style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary),
@@ -842,7 +920,8 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               ),
               child: Icon(TablerIcons.clock, color: ColorTokens.accent),
             ),
-            title: Text('Time', style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
+            title: Text('Time',
+                style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
             subtitle: Text(
               _selectedTime.format(context),
               style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary),
