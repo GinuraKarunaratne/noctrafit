@@ -4,7 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart'; // ✅ added
+import 'package:go_router/go_router.dart';
 import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/repository_providers.dart';
@@ -38,6 +38,7 @@ class _ActiveSessionProgressScreenState
     extends ConsumerState<ActiveSessionProgressScreen> {
   Timer? _timer;
   Duration _elapsed = Duration.zero;
+
   ActiveSession? _session;
   WorkoutSet? _workoutSet;
   List<Map<String, dynamic>> _exercises = [];
@@ -56,12 +57,13 @@ class _ActiveSessionProgressScreenState
   Future<void> _announceStart() async {
     await Future.delayed(const Duration(milliseconds: 500));
     final tts = ref.read(ttsServiceProvider);
-    if (_session != null) {
-      await tts.speakWorkoutStarted(_session!.workoutSetName);
+    final s = _session;
+    if (s != null) {
+      await tts.speakWorkoutStarted(s.workoutSetName);
     }
   }
 
-  // ✅ Safe helpers to avoid Null -> String crashes
+  // ✅ Safe helpers
   String _safeString(dynamic v, {String fallback = 'Unknown exercise'}) {
     if (v == null) return fallback;
     final s = v.toString().trim();
@@ -80,47 +82,80 @@ class _ActiveSessionProgressScreenState
     return s.isEmpty ? null : s;
   }
 
+  /// ✅ Decode exercises JSON safely (and accept your keys: duration_sec/rest_sec)
+  List<Map<String, dynamic>> _safeDecodeExercises(String rawJson) {
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> _loadSession() async {
+    // ✅ IMPORTANT: load the active session ONLY if its uuid matches this route param.
     final session = await ref
         .read(sessionRepositoryProvider)
-        .getActiveSession();
-    if (session != null && mounted) {
-      // Get all sets and find by ID
-      final allSets = await ref.read(setsRepositoryProvider).getAllSets();
+        .getSessionByUuid(widget.sessionUuid);
 
-      // Try to find by numeric id first; avoid throwing if not present.
-      final matching = allSets
-          .where((set) => set.id == session.workoutSetId)
-          .toList();
-      WorkoutSet? workoutSet = matching.isNotEmpty ? matching.first : null;
+    if (!mounted) return;
 
-      // If not found by id, try to find by UUID (if session stores it)
-      if (workoutSet == null && session.workoutSetUuid != null) {
-        workoutSet = await ref
-            .read(setsRepositoryProvider)
-            .getSetByUuid(session.workoutSetUuid!);
-      }
+    // If route is stale or session ended, show loading/error state (no random fallback!)
+    if (session == null) {
+      setState(() {
+        _session = null;
+        _workoutSet = null;
+        _exercises = [];
+      });
+      return;
+    }
 
-      // If still not found, fallback to first available set to avoid crash (UI will treat as loading)
-      if (workoutSet == null && allSets.isNotEmpty) {
-        workoutSet = allSets.first;
-      }
+    final setsRepo = ref.read(setsRepositoryProvider);
 
+    // ✅ Find the correct workout set (no getSetById method needed)
+    WorkoutSet? workoutSet;
+
+    // Prefer UUID mapping when present (best for community sets)
+    final setUuid = session.workoutSetUuid;
+    if (setUuid != null && setUuid.trim().isNotEmpty) {
+      workoutSet = await setsRepo.getSetByUuid(setUuid);
+    }
+
+    // Fallback: try by numeric ID via getAllSets() + filter
+    if (workoutSet == null) {
+      final allSets = await setsRepo.getAllSets();
+      final matches = allSets.where((s) => s.id == session.workoutSetId).toList();
+      workoutSet = matches.isNotEmpty ? matches.first : null;
+    }
+
+    if (!mounted) return;
+
+    // If we STILL can't resolve the workout set, don't display seeded random.
+    if (workoutSet == null) {
       setState(() {
         _session = session;
-        _workoutSet = workoutSet;
+        _workoutSet = null;
+        _exercises = [];
         _elapsed = DateTime.now().difference(session.startedAt);
-
-        // Parse exercises JSON defensively
-        try {
-          final exercisesJson =
-              jsonDecode(_workoutSet?.exercises ?? '[]') as List<dynamic>;
-          _exercises = exercisesJson.cast<Map<String, dynamic>>();
-        } catch (e) {
-          _exercises = [];
-        }
       });
+      return;
     }
+
+    // Parse exercises (from workout set)
+    final parsedExercises = _safeDecodeExercises(workoutSet.exercises);
+
+    setState(() {
+      _session = session;
+      _workoutSet = workoutSet;
+      _exercises = parsedExercises;
+      _elapsed = DateTime.now().difference(session.startedAt);
+    });
   }
 
   @override
@@ -131,35 +166,29 @@ class _ActiveSessionProgressScreenState
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {
-          _elapsed = _elapsed + const Duration(seconds: 1);
-        });
+      if (!mounted) return;
+      setState(() {
+        _elapsed = _elapsed + const Duration(seconds: 1);
+      });
 
-        // Check for milestones
-        _checkMilestones();
-
-        // TODO: Persist to active_session table
-        // ref.read(sessionRepositoryProvider).updateElapsedTime(widget.sessionUuid, _elapsed);
-      }
+      _checkMilestones();
     });
   }
 
   void _checkMilestones() {
-    if (_session == null) return;
+    final s = _session;
+    if (s == null) return;
 
     final progress = _getProgressPercentage();
-    final remainingMinutes = _session!.estimatedMinutes - (_elapsed.inMinutes);
+    final remainingMinutes = s.estimatedMinutes - (_elapsed.inMinutes);
 
     final tts = ref.read(ttsServiceProvider);
 
-    // 50% milestone
     if (progress >= 0.5 && !_hasSpoken50Percent) {
       _hasSpoken50Percent = true;
       tts.speakHalfwayMilestone();
     }
 
-    // 10 minutes remaining
     if (remainingMinutes <= 10 &&
         remainingMinutes > 9 &&
         !_hasSpoken10MinRemaining) {
@@ -169,33 +198,34 @@ class _ActiveSessionProgressScreenState
   }
 
   double _getProgressPercentage() {
-    if (_exercises.isEmpty || _session == null) return 0;
-    return (_session!.currentExerciseIndex + 1) / _exercises.length;
+    final s = _session;
+    if (s == null || _exercises.isEmpty) return 0;
+    return (s.currentExerciseIndex + 1) / _exercises.length;
   }
 
-  void _previousExercise() async {
-    if (_session == null || _session!.currentExerciseIndex <= 0) return;
+  Future<void> _previousExercise() async {
+    final s = _session;
+    if (s == null || s.currentExerciseIndex <= 0) return;
 
     await ref.read(sessionRepositoryProvider).goToPreviousExercise();
     await _loadSession();
   }
 
-  void _nextExercise() async {
-    if (_session == null ||
-        _session!.currentExerciseIndex >= _exercises.length - 1) {
-      return;
-    }
+  Future<void> _nextExercise() async {
+    final s = _session;
+    if (s == null) return;
+
+    if (_exercises.isEmpty) return;
+    if (s.currentExerciseIndex >= _exercises.length - 1) return;
 
     await ref.read(sessionRepositoryProvider).progressToNextExercise();
     await _loadSession();
 
     // Announce next exercise
     final tts = ref.read(ttsServiceProvider);
-    if (_session != null && _exercises.isNotEmpty) {
-      final nextIndex = (_session!.currentExerciseIndex + 1).clamp(
-        0,
-        _exercises.length - 1,
-      );
+    final s2 = _session;
+    if (s2 != null && _exercises.isNotEmpty) {
+      final nextIndex = (s2.currentExerciseIndex + 1).clamp(0, _exercises.length - 1);
       final nextExercise = _exercises[nextIndex];
       final exerciseName = _safeString(nextExercise['name']);
       await tts.speakNextExercise(exerciseName);
@@ -203,52 +233,86 @@ class _ActiveSessionProgressScreenState
   }
 
   Future<void> _completeWorkout() async {
-    if (_session == null || _workoutSet == null) return;
+    final s = _session;
+    final ws = _workoutSet;
+    if (s == null || ws == null) return;
 
     _timer?.cancel();
 
-    // Announce completion
     final tts = ref.read(ttsServiceProvider);
     await tts.speakWorkoutCompleted();
 
-    // Complete session and save to completion logs
     await ref.read(sessionRepositoryProvider).completeSession();
 
-    if (mounted) {
-      // Parse completed exercises count
-      int completedCount = 0;
-      try {
-        final completed =
-            jsonDecode(_session!.completedExercises) as List<dynamic>;
-        completedCount = completed.length;
-      } catch (e) {
-        completedCount = _session!.currentExerciseIndex;
-      }
+    if (!mounted) return;
 
-      // Show completion dialog
-      await showDialog(
-        context: context,
-        builder: (context) => _CompletionDialog(
-          workoutName: _workoutSet!.name,
-          duration: _elapsed,
-          exercisesCompleted: completedCount,
-          totalExercises: _exercises.length,
-        ),
-      );
-
-      // Navigate to home after completion
-      if (mounted) {
-        context.go('/home');
-      }
+    int completedCount = 0;
+    try {
+      final completed = jsonDecode(s.completedExercises) as List<dynamic>;
+      completedCount = completed.length;
+    } catch (_) {
+      completedCount = s.currentExerciseIndex;
     }
+
+    await showDialog(
+      context: context,
+      builder: (context) => _CompletionDialog(
+        workoutName: ws.name,
+        duration: _elapsed,
+        exercisesCompleted: completedCount,
+        totalExercises: _exercises.length,
+      ),
+    );
+
+    if (!mounted) return;
+    context.go('/home');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Show loading state if session not loaded yet
-    if (_session == null || _workoutSet == null || _exercises.isEmpty) {
+    // ✅ Loading / missing states (no random seeded fallback)
+    if (_session == null) {
+      return Scaffold(
+        backgroundColor: ColorTokens.background,
+        appBar: AppBar(title: const Text('Loading...')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_workoutSet == null) {
+      return Scaffold(
+        backgroundColor: ColorTokens.background,
+        appBar: AppBar(
+          title: const Text('Workout'),
+          leading: IconButton(
+            icon: Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
+            onPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                context.go('/home');
+              }
+            },
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Workout set not found for this session.\n(Maybe it was deleted or not synced yet)',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: ColorTokens.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_exercises.isEmpty) {
       return Scaffold(
         backgroundColor: ColorTokens.background,
         appBar: AppBar(title: const Text('Loading...')),
@@ -257,8 +321,6 @@ class _ActiveSessionProgressScreenState
     }
 
     final currentExerciseIndex = _session!.currentExerciseIndex;
-
-    // ✅ extra safety: clamp index just in case
     final safeIndex = currentExerciseIndex.clamp(0, _exercises.length - 1);
     final currentExercise = _exercises[safeIndex];
 
@@ -267,15 +329,20 @@ class _ActiveSessionProgressScreenState
     final exerciseName = _safeString(currentExercise['name']);
     final sets = _safeInt(currentExercise['sets']);
     final reps = _safeInt(currentExercise['reps']);
-    final duration = _safeNullableString(currentExercise['duration']);
-    final rest = _safeNullableString(currentExercise['rest']);
+
+    // ✅ IMPORTANT: your JSON uses duration_sec / rest_sec (based on your table comment)
+    final durationSec = currentExercise['duration_sec'] ?? currentExercise['duration'];
+    final restSec = currentExercise['rest_sec'] ?? currentExercise['rest'];
+
+    final duration = _safeNullableString(durationSec);
+    final rest = _safeNullableString(restSec);
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
       appBar: AppBar(
         title: Text(
           _workoutSet!.name,
-          style:  TextStyle(
+          style: TextStyle(
             color: ColorTokens.textPrimary,
             fontWeight: FontWeight.bold,
           ),
@@ -285,11 +352,9 @@ class _ActiveSessionProgressScreenState
         leading: IconButton(
           icon: Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
           onPressed: () {
-            // Avoid popping the last page (which causes GoRouter assertion).
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
-              // If there's no page to pop, navigate to home explicitly.
               context.go('/home');
             }
           },
@@ -298,7 +363,6 @@ class _ActiveSessionProgressScreenState
           IconButton(
             icon: Icon(TablerIcons.x, color: ColorTokens.textSecondary),
             onPressed: () async {
-              // Show confirmation dialog
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -314,27 +378,21 @@ class _ActiveSessionProgressScreenState
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: Text('Cancel'),
+                      child: const Text('Cancel'),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: Text(
-                        'End',
-                        style: TextStyle(color: ColorTokens.error),
-                      ),
+                      child: Text('End', style: TextStyle(color: ColorTokens.error)),
                     ),
                   ],
                 ),
               );
 
-              if (confirmed == true && mounted) {
+              if (confirmed == true) {
                 _timer?.cancel();
                 await ref.read(sessionRepositoryProvider).completeSession();
-
-                // ✅ GoRouter-safe: go home instead of popping last page
-                if (mounted) {
-                  context.go('/home');
-                }
+                if (!mounted) return;
+                context.go('/home');
               }
             },
           ),
@@ -354,7 +412,6 @@ class _ActiveSessionProgressScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Large timer
                       Text(
                         _formatElapsed(_elapsed),
                         style: theme.textTheme.displayLarge?.copyWith(
@@ -406,10 +463,7 @@ class _ActiveSessionProgressScreenState
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -441,25 +495,13 @@ class _ActiveSessionProgressScreenState
                     spacing: 16,
                     children: [
                       if (sets != null)
-                        _ExerciseDetail(
-                          icon: TablerIcons.repeat,
-                          label: '$sets sets',
-                        ),
+                        _ExerciseDetail(icon: TablerIcons.repeat, label: '$sets sets'),
                       if (reps != null)
-                        _ExerciseDetail(
-                          icon: TablerIcons.number,
-                          label: '$reps reps',
-                        ),
+                        _ExerciseDetail(icon: TablerIcons.number, label: '$reps reps'),
                       if (duration != null)
-                        _ExerciseDetail(
-                          icon: TablerIcons.clock,
-                          label: duration,
-                        ),
+                        _ExerciseDetail(icon: TablerIcons.clock, label: '${duration}s'),
                       if (rest != null)
-                        _ExerciseDetail(
-                          icon: TablerIcons.clock_pause,
-                          label: 'Rest $rest',
-                        ),
+                        _ExerciseDetail(icon: TablerIcons.clock_pause, label: 'Rest ${rest}s'),
                     ],
                   ),
                 ],
@@ -473,7 +515,6 @@ class _ActiveSessionProgressScreenState
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  // Previous button
                   Expanded(
                     child: OutlinedButton(
                       onPressed: safeIndex > 0 ? _previousExercise : null,
@@ -510,15 +551,10 @@ class _ActiveSessionProgressScreenState
                       ),
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
-                  // Next button
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: safeIndex < _exercises.length - 1
-                          ? _nextExercise
-                          : null,
+                      onPressed: safeIndex < _exercises.length - 1 ? _nextExercise : null,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: safeIndex < _exercises.length - 1
@@ -736,7 +772,7 @@ class _ExerciseDetail extends StatelessWidget {
   }
 }
 
-/// Completion dialog
+/// Completion dialog (unchanged UI)
 class _CompletionDialog extends StatelessWidget {
   final String workoutName;
   final Duration duration;
@@ -770,7 +806,7 @@ class _CompletionDialog extends StatelessWidget {
               color: ColorTokens.success.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child:  Icon(
+            child: Icon(
               TablerIcons.circle_check_filled,
               color: ColorTokens.success,
               size: 48,
@@ -826,7 +862,7 @@ class _CompletionDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child:  Text(
+            child: Text(
               'Done',
               style: TextStyle(
                 color: ColorTokens.background,

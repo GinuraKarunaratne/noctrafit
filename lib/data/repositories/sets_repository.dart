@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:logger/logger.dart';
+
 import '../local/db/app_database.dart';
-import '../local/db/daos/workout_sets_dao.dart';
 import '../local/db/daos/sync_queue_dao.dart';
+import '../local/db/daos/workout_sets_dao.dart';
 
 /// Repository for workout sets with offline-first architecture
 /// ALWAYS loads from local SQLite first, syncs with Firestore in background
@@ -15,42 +18,20 @@ class SetsRepository {
 
   // ========== Read Operations (Always from Local) ==========
 
-  /// Get all workout sets (offline-first)
-  Future<List<WorkoutSet>> getAllSets() {
-    return _localDao.getAllSets();
-  }
+  Future<List<WorkoutSet>> getAllSets() => _localDao.getAllSets();
+  Stream<List<WorkoutSet>> watchAllSets() => _localDao.watchAllSets();
 
-  /// Watch all workout sets (stream)
-  Stream<List<WorkoutSet>> watchAllSets() {
-    return _localDao.watchAllSets();
-  }
+  Future<WorkoutSet?> getSetByUuid(String uuid) => _localDao.getSetByUuid(uuid);
 
-  /// Get workout set by UUID
-  Future<WorkoutSet?> getSetByUuid(String uuid) {
-    return _localDao.getSetByUuid(uuid);
-  }
+  Future<List<WorkoutSet>> getSetsBySource(String source) =>
+      _localDao.getSetsBySource(source);
 
-  /// Get sets by source (seed, user, community)
-  Future<List<WorkoutSet>> getSetsBySource(String source) {
-    return _localDao.getSetsBySource(source);
-  }
+  Stream<List<WorkoutSet>> watchSetsBySource(String source) =>
+      _localDao.watchSetsBySource(source);
 
-  /// Watch sets by source (stream)
-  Stream<List<WorkoutSet>> watchSetsBySource(String source) {
-    return _localDao.watchSetsBySource(source);
-  }
+  Future<List<WorkoutSet>> getFavoriteSets() => _localDao.getFavoriteSets();
+  Future<List<WorkoutSet>> searchSets(String query) => _localDao.searchSets(query);
 
-  /// Get favorite sets
-  Future<List<WorkoutSet>> getFavoriteSets() {
-    return _localDao.getFavoriteSets();
-  }
-
-  /// Search sets by query
-  Future<List<WorkoutSet>> searchSets(String query) {
-    return _localDao.searchSets(query);
-  }
-
-  /// Get sets with filters
   Future<List<WorkoutSet>> filterSets({
     String? source,
     String? category,
@@ -65,7 +46,6 @@ class SetsRepository {
     );
   }
 
-  /// Get sets sorted
   Future<List<WorkoutSet>> getSortedSets({
     required String sortBy,
     bool ascending = false,
@@ -73,7 +53,6 @@ class SetsRepository {
     return _localDao.getSetsSorted(sortBy: sortBy, ascending: ascending);
   }
 
-  /// Combined filter and search
   Future<List<WorkoutSet>> filterAndSearch({
     String? query,
     String? source,
@@ -83,7 +62,6 @@ class SetsRepository {
     String sortBy = 'recent',
     bool ascending = false,
   }) async {
-    // Get filtered sets
     var sets = await filterSets(
       source: source,
       category: category,
@@ -91,7 +69,6 @@ class SetsRepository {
       isFavorite: isFavorite,
     );
 
-    // Apply search if query provided
     if (query != null && query.isNotEmpty) {
       final lowercaseQuery = query.toLowerCase();
       sets = sets.where((set) {
@@ -100,7 +77,6 @@ class SetsRepository {
       }).toList();
     }
 
-    // Apply sorting
     sets.sort((a, b) {
       int comparison;
       switch (sortBy) {
@@ -111,7 +87,11 @@ class SetsRepository {
           comparison = a.estimatedMinutes.compareTo(b.estimatedMinutes);
           break;
         case 'difficulty':
-          final difficultyOrder = {'beginner': 0, 'intermediate': 1, 'advanced': 2};
+          final difficultyOrder = {
+            'beginner': 0,
+            'intermediate': 1,
+            'advanced': 2
+          };
           comparison = (difficultyOrder[a.difficulty] ?? 0)
               .compareTo(difficultyOrder[b.difficulty] ?? 0);
           break;
@@ -128,8 +108,6 @@ class SetsRepository {
 
   // ========== Create Operations ==========
 
-  /// Create a new custom workout set (user-created)
-  /// Saves locally first, queues for Firestore sync
   Future<WorkoutSet> createCustomSet({
     required String name,
     required String description,
@@ -140,8 +118,6 @@ class SetsRepository {
     String? authorName,
   }) async {
     final now = DateTime.now();
-
-    // Generate UUID
     final uuid = DateTime.now().millisecondsSinceEpoch.toString();
 
     final companion = WorkoutSetsCompanion(
@@ -160,17 +136,13 @@ class SetsRepository {
       updatedAt: Value(now),
     );
 
-    // Save locally FIRST (offline-first)
     await _localDao.insertSet(companion);
 
-    // Get the created set
     final createdSet = await _localDao.getSetByUuid(uuid);
-
     _logger.i('Created custom workout set: $name');
     return createdSet!;
   }
 
-  /// Queue workout set for community upload
   Future<void> queueForCommunityUpload(WorkoutSet set) async {
     await _syncQueue.enqueue(
       entityType: 'workout_set',
@@ -183,11 +155,9 @@ class SetsRepository {
 
   // ========== Update Operations ==========
 
-  /// Update a workout set
   Future<void> updateSet(WorkoutSet set) async {
     await _localDao.updateSet(set);
 
-    // If user-created, queue for sync
     if (set.source == 'user') {
       await _syncQueue.enqueue(
         entityType: 'workout_set',
@@ -200,21 +170,17 @@ class SetsRepository {
     _logger.i('Updated workout set: ${set.name}');
   }
 
-  /// Toggle favorite status
-  Future<void> toggleFavorite(int id, bool isFavorite) {
-    return _localDao.toggleFavorite(id, isFavorite);
-  }
+  Future<void> toggleFavorite(int id, bool isFavorite) =>
+      _localDao.toggleFavorite(id, isFavorite);
 
   // ========== Delete Operations ==========
 
-  /// Delete a workout set
   Future<void> deleteSet(int id) async {
     final set = await _localDao.getSetById(id);
     if (set == null) return;
 
     await _localDao.deleteSet(id);
 
-    // If user-created, queue for deletion sync
     if (set.source == 'user') {
       await _syncQueue.enqueue(
         entityType: 'workout_set',
@@ -229,19 +195,25 @@ class SetsRepository {
 
   // ========== Sync Operations (Background) ==========
 
-  /// Upsert set from Firestore (during sync)
-  Future<void> upsertFromFirestore(Map<String, dynamic> firestoreData) async {
+  /// ✅ Upsert set from Firestore (during sync)
+  /// - tolerant to missing fields
+  /// - accepts fallbackUuid (use doc.id or route uuid)
+  Future<void> upsertFromFirestore(
+    Map<String, dynamic> firestoreData, {
+    String? fallbackUuid,
+  }) async {
     try {
-      final set = _deserializeSet(firestoreData);
+      final set = _deserializeSet(firestoreData, fallbackUuid: fallbackUuid);
       await _localDao.upsertSet(set);
       _logger.d('Upserted set from Firestore: ${set.name}');
-    } catch (e) {
-      _logger.e('Failed to upsert set from Firestore', error: e);
+    } catch (e, st) {
+      _logger.e('Failed to upsert set from Firestore', error: e, stackTrace: st);
     }
   }
 
-  /// Batch upsert multiple sets from Firestore
-  Future<void> batchUpsertFromFirestore(List<Map<String, dynamic>> firestoreDataList) async {
+  Future<void> batchUpsertFromFirestore(
+    List<Map<String, dynamic>> firestoreDataList,
+  ) async {
     for (final data in firestoreDataList) {
       await upsertFromFirestore(data);
     }
@@ -250,52 +222,133 @@ class SetsRepository {
 
   // ========== Count & Stats ==========
 
-  Future<int> countSets() {
-    return _localDao.countSets();
-  }
-
-  Future<int> countSetsBySource(String source) {
-    return _localDao.countSetsBySource(source);
-  }
+  Future<int> countSets() => _localDao.countSets();
+  Future<int> countSetsBySource(String source) => _localDao.countSetsBySource(source);
 
   // ========== Helpers ==========
 
   String _serializeSet(WorkoutSet set) {
-    // Convert to JSON-serializable map
-    return '''
-    {
-      "uuid": "${set.uuid}",
-      "name": "${set.name}",
-      "description": "${set.description ?? ''}",
-      "difficulty": "${set.difficulty}",
-      "category": "${set.category}",
-      "estimated_minutes": ${set.estimatedMinutes},
-      "exercises": ${set.exercises},
-      "source": "${set.source}",
-      "author_id": "${set.authorId ?? ''}",
-      "author_name": "${set.authorName ?? ''}",
-      "created_at": "${set.createdAt.toIso8601String()}",
-      "updated_at": "${set.updatedAt.toIso8601String()}"
-    }
-    ''';
+    // ✅ safer JSON encoding (no manual multiline string)
+    final map = <String, dynamic>{
+      'uuid': set.uuid,
+      'name': set.name,
+      'description': set.description,
+      'difficulty': set.difficulty,
+      'category': set.category,
+      'estimated_minutes': set.estimatedMinutes,
+      // exercises is already JSON string in DB, keep as decoded if possible
+      'exercises': (() {
+        try {
+          return jsonDecode(set.exercises);
+        } catch (_) {
+          return set.exercises;
+        }
+      })(),
+      'source': set.source,
+      'author_id': set.authorId,
+      'author_name': set.authorName,
+      'created_at': set.createdAt.toIso8601String(),
+      'updated_at': set.updatedAt.toIso8601String(),
+    };
+    return jsonEncode(map);
   }
 
-  WorkoutSet _deserializeSet(Map<String, dynamic> data) {
+  // ---- robust parsing helpers ----
+  String _s(dynamic v, {String fallback = ''}) {
+    if (v == null) return fallback;
+    final str = v.toString().trim();
+    return str.isEmpty ? fallback : str;
+  }
+
+  int _i(dynamic v, {int fallback = 0}) {
+    if (v == null) return fallback;
+    if (v is int) return v;
+    return int.tryParse(v.toString()) ?? fallback;
+  }
+
+  DateTime _dt(dynamic v, {DateTime? fallback}) {
+    if (v == null) return fallback ?? DateTime.now();
+
+    if (v is DateTime) return v;
+
+    // Firestore Timestamp without importing it directly
+    try {
+      if (v.runtimeType.toString() == 'Timestamp') {
+        return (v as dynamic).toDate() as DateTime;
+      }
+    } catch (_) {}
+
+    final parsed = DateTime.tryParse(v.toString());
+    return parsed ?? (fallback ?? DateTime.now());
+  }
+
+  String _jsonString(dynamic v) {
+    if (v == null) return '[]';
+    if (v is String) return v;
+    try {
+      return jsonEncode(v);
+    } catch (_) {
+      return '[]';
+    }
+  }
+
+  /// ✅ Safe deserializer (NO hard casts)
+  WorkoutSet _deserializeSet(
+    Map<String, dynamic> data, {
+    String? fallbackUuid,
+  }) {
+    // uuid is required in Drift; fallback to doc.id / route uuid
+    final uuid = _s(
+      data['uuid'],
+      fallback: _s(data['id'], fallback: _s(fallbackUuid, fallback: '')),
+    );
+
+    final safeUuid =
+        uuid.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : uuid;
+
+    final name = _s(data['name'], fallback: 'Untitled Workout');
+
+    final description = data['description']?.toString();
+
+    final difficulty = _s(data['difficulty'], fallback: 'intermediate');
+    final category = _s(data['category'], fallback: 'hybrid');
+
+    final estimatedMinutes = _i(
+      data['estimated_minutes'],
+      fallback: _i(data['estimatedMinutes'], fallback: 30),
+    );
+
+    final exercisesStr = _jsonString(data['exercises']);
+
+    final source = _s(data['source'], fallback: 'community');
+
+    final authorId = _s(
+      data['author_id'],
+      fallback: _s(data['authorId'], fallback: _s(data['author_uid'], fallback: '')),
+    );
+    final authorName = _s(
+      data['author_name'],
+      fallback: _s(data['authorName'], fallback: ''),
+    );
+
+    final createdAt = _dt(data['created_at'], fallback: DateTime.now());
+    final updatedAt = _dt(data['updated_at'], fallback: createdAt);
+
     return WorkoutSet(
-      id: 0, // Will be auto-assigned
-      uuid: data['uuid'] as String,
-      name: data['name'] as String,
-      description: data['description'] as String?,
-      difficulty: data['difficulty'] as String,
-      category: data['category'] as String,
-      estimatedMinutes: data['estimated_minutes'] as int,
-      exercises: data['exercises'] as String,
-      source: data['source'] as String,
-      authorId: data['author_id'] as String?,
-      authorName: data['author_name'] as String?,
+      id: 0, // auto assigned
+      uuid: safeUuid,
+      name: name,
+      description: description,
+      difficulty: difficulty,
+      category: category,
+      estimatedMinutes: estimatedMinutes,
+      exercises: exercisesStr,
+      source: source,
+      authorId: authorId.isEmpty ? null : authorId,
+      authorName: authorName.isEmpty ? null : authorName,
       isFavorite: false,
-      createdAt: DateTime.parse(data['created_at'] as String),
-      updatedAt: DateTime.parse(data['updated_at'] as String),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
       lastSyncedAt: DateTime.now(),
     );
   }

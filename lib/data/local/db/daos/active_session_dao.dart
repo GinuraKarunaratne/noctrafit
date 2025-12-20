@@ -20,6 +20,21 @@ class ActiveSessionDao extends DatabaseAccessor<AppDatabase>
     return (select(activeSessions)..where((t) => t.id.equals(1))).watchSingleOrNull();
   }
 
+  /// ✅ NEW: get session only if the uuid matches the session stored in row 1
+  /// This makes /session/:sessionUuid correct, and prevents loading the wrong plan.
+  Future<ActiveSession?> getSessionByUuid(String sessionUuid) async {
+    return (select(activeSessions)
+          ..where((t) => t.id.equals(1) & t.sessionUuid.equals(sessionUuid)))
+        .getSingleOrNull();
+  }
+
+  /// ✅ NEW: watch session only if uuid matches (optional but super useful)
+  Stream<ActiveSession?> watchSessionByUuid(String sessionUuid) {
+    return (select(activeSessions)
+          ..where((t) => t.id.equals(1) & t.sessionUuid.equals(sessionUuid)))
+        .watchSingleOrNull();
+  }
+
   /// Check if there's an active session
   Future<bool> hasActiveSession() async {
     final session = await getActiveSession();

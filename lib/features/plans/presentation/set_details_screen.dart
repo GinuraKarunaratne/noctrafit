@@ -22,10 +22,7 @@ import '../../../data/remote/firestore/user_remote_datasource.dart';
 class SetDetailsScreen extends ConsumerStatefulWidget {
   final String workoutSetUuid;
 
-  const SetDetailsScreen({
-    super.key,
-    required this.workoutSetUuid,
-  });
+  const SetDetailsScreen({super.key, required this.workoutSetUuid});
 
   @override
   ConsumerState<SetDetailsScreen> createState() => _SetDetailsScreenState();
@@ -89,15 +86,17 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
   Future<void> _loadWorkoutSet() async {
     // Try local DB first
-    var set =
-        await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
+    var set = await ref
+        .read(setsRepositoryProvider)
+        .getSetByUuid(widget.workoutSetUuid);
 
     // If not found locally, try remote by uuid field
     if (set == null) {
       try {
         final setsRemote = ref.read(setsRemoteDataSourceProvider);
-        final remote =
-            await setsRemote.fetchCommunitySetByUuid(uuid: widget.workoutSetUuid);
+        final remote = await setsRemote.fetchCommunitySetByUuid(
+          uuid: widget.workoutSetUuid,
+        );
         if (remote != null) {
           final exercisesRaw = remote['exercises'];
           final exercisesStr = exercisesRaw is String
@@ -113,7 +112,8 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             category: (remote['category'] ?? 'hybrid').toString(),
             estimatedMinutes: remote['estimated_minutes'] is int
                 ? remote['estimated_minutes'] as int
-                : int.tryParse(remote['estimated_minutes']?.toString() ?? '') ?? 30,
+                : int.tryParse(remote['estimated_minutes']?.toString() ?? '') ??
+                      30,
             exercises: exercisesStr,
             source: 'community',
             authorId: remote['author_id'] ?? remote['author_uid'],
@@ -130,7 +130,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
           // Persist the fetched remote set into local DB for offline availability
           try {
-            await ref.read(setsRepositoryProvider).upsertFromFirestore(remote);
+            await ref
+                .read(setsRepositoryProvider)
+                .upsertFromFirestore(
+                  remote,
+                  fallbackUuid: widget.workoutSetUuid,
+                );
           } catch (_) {}
         }
       } catch (_) {}
@@ -159,7 +164,8 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             category: (data['category'] ?? 'hybrid').toString(),
             estimatedMinutes: data['estimated_minutes'] is int
                 ? data['estimated_minutes'] as int
-                : int.tryParse(data['estimated_minutes']?.toString() ?? '') ?? 30,
+                : int.tryParse(data['estimated_minutes']?.toString() ?? '') ??
+                      30,
             exercises: exercisesStr,
             source: 'community',
             authorId: data['author_id'] ?? data['author_uid'],
@@ -176,7 +182,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
           // Persist the document into local DB so it becomes available offline
           try {
-            await ref.read(setsRepositoryProvider).upsertFromFirestore(data);
+            await ref
+                .read(setsRepositoryProvider)
+                .upsertFromFirestore(data, fallbackUuid: doc.id);
           } catch (_) {}
         }
       } catch (_) {}
@@ -216,12 +224,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
           // ✅ the important part (name + details)
           'name': ex?.name ?? item['name'] ?? 'Unknown exercise',
-          'muscleGroup': ex?.muscleGroup ??
+          'muscleGroup':
+              ex?.muscleGroup ??
               item['muscleGroup'] ??
               item['muscle_group'] ??
               '',
-          'equipment':
-              ex?.equipment ?? item['equipment'] ?? '',
+          'equipment': ex?.equipment ?? item['equipment'] ?? '',
 
           // ✅ optional (if you ever show later)
           'instructions': ex?.instructions ?? item['instructions'] ?? '',
@@ -230,8 +238,8 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           'rest': restSec?.toString(),
           'duration': durationSec != null
               ? (durationSec.toString().contains('s')
-                  ? durationSec.toString()
-                  : '${durationSec}s')
+                    ? durationSec.toString()
+                    : '${durationSec}s')
               : null,
         });
       }
@@ -274,7 +282,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
   Future<void> _startWorkout() async {
     if (_workoutSet == null) return;
 
-    await ref.read(sessionRepositoryProvider).startSession(
+    await ref
+        .read(sessionRepositoryProvider)
+        .startSession(
           workoutSetId: _workoutSet!.id,
           workoutSetName: _workoutSet!.name,
           workoutSetUuid: _workoutSet!.uuid,
@@ -282,56 +292,62 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           estimatedMinutes: _workoutSet!.estimatedMinutes,
         );
 
-    final session = await ref.read(sessionRepositoryProvider).getActiveSession();
+    final session = await ref
+        .read(sessionRepositoryProvider)
+        .getActiveSession();
     if (session != null && mounted) {
       context.go('/session/${session.sessionUuid}');
     }
   }
 
   Future<void> _addToCalendar() async {
-  if (_workoutSet == null) return;
+    if (_workoutSet == null) return;
 
-  final result = await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (context) => _AddToCalendarDialog(),
-  );
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _AddToCalendarDialog(),
+    );
 
-  if (result != null) {
-    final DateTime date = result['date'] as DateTime;
-    final TimeOfDay time = result['time'] as TimeOfDay;
-    final String timeString = _timeOfDayTo24hString(time);
+    if (result != null) {
+      final DateTime date = result['date'] as DateTime;
+      final TimeOfDay time = result['time'] as TimeOfDay;
+      final String timeString = _timeOfDayTo24hString(time);
 
-    final String? noteRaw = result['note'] as String?;
-    final String? note =
-        (noteRaw == null || noteRaw.trim().isEmpty) ? null : noteRaw.trim();
+      final String? noteRaw = result['note'] as String?;
+      final String? note = (noteRaw == null || noteRaw.trim().isEmpty)
+          ? null
+          : noteRaw.trim();
 
-    await ref.read(scheduleRepositoryProvider).scheduleWorkout(
-          workoutSetId: _workoutSet!.id,
-          scheduledDate: date,
-          timeOfDay: timeString,
-          note: note,
-          workoutName: _workoutSet!.name,
+      await ref
+          .read(scheduleRepositoryProvider)
+          .scheduleWorkout(
+            workoutSetId: _workoutSet!.id,
+            scheduledDate: date,
+            timeOfDay: timeString,
+            note: note,
+            workoutName: _workoutSet!.name,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Workout scheduled for ${date.toString().split(' ')[0]} at $timeString',
+            ),
+            backgroundColor: ColorTokens.success,
+          ),
         );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Workout scheduled for ${date.toString().split(' ')[0]} at $timeString'),
-          backgroundColor: ColorTokens.success,
-        ),
-      );
+      }
     }
   }
-}
-
 
   // ✅ NEW: actually delete from Firestore if it’s a community set you own
   Future<void> _deleteWorkout() async {
     if (_workoutSet == null) return;
 
     final user = ref.read(currentUserProvider);
-    final isOwnedCommunity = _workoutSet!.source == 'community' &&
+    final isOwnedCommunity =
+        _workoutSet!.source == 'community' &&
         user != null &&
         user.uid == _workoutSet!.authorId;
 
@@ -340,8 +356,10 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: ColorTokens.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title:
-            Text('Delete workout?', style: TextStyle(color: ColorTokens.textPrimary)),
+        title: Text(
+          'Delete workout?',
+          style: TextStyle(color: ColorTokens.textPrimary),
+        ),
         content: Text(
           isOwnedCommunity
               ? 'This will delete the workout from Community (Firestore) and also remove it locally.'
@@ -351,12 +369,18 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: ColorTokens.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: ColorTokens.error),
-            child: Text('Delete', style: TextStyle(color: ColorTokens.background)),
+            child: Text(
+              'Delete',
+              style: TextStyle(color: ColorTokens.background),
+            ),
           ),
         ],
       ),
@@ -385,7 +409,10 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Workout deleted'), backgroundColor: ColorTokens.success),
+          SnackBar(
+            content: Text('Workout deleted'),
+            backgroundColor: ColorTokens.success,
+          ),
         );
         Navigator.pop(context);
       }
@@ -423,8 +450,10 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     }
 
     final user = ref.read(currentUserProvider);
-    final canDelete = _workoutSet!.source == 'user' ||
-        (_workoutSet!.source == 'community' && user?.uid == _workoutSet!.authorId);
+    final canDelete =
+        _workoutSet!.source == 'user' ||
+        (_workoutSet!.source == 'community' &&
+            user?.uid == _workoutSet!.authorId);
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
@@ -435,7 +464,10 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             pinned: true,
             backgroundColor: ColorTokens.background,
             leading: IconButton(
-              icon: Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
+              icon: Icon(
+                TablerIcons.arrow_left,
+                color: ColorTokens.textPrimary,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
@@ -446,7 +478,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                 ),
               IconButton(
                 icon: Icon(
-                  _workoutSet!.isFavorite ? TablerIcons.star_filled : TablerIcons.star,
+                  _workoutSet!.isFavorite
+                      ? TablerIcons.star_filled
+                      : TablerIcons.star,
                   color: _workoutSet!.isFavorite
                       ? ColorTokens.accent
                       : ColorTokens.textPrimary,
@@ -485,14 +519,17 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                           spacing: 8,
                           children: [
                             _InfoChip(
-                                icon: TablerIcons.clock,
-                                label: '${_workoutSet!.estimatedMinutes} min'),
+                              icon: TablerIcons.clock,
+                              label: '${_workoutSet!.estimatedMinutes} min',
+                            ),
                             _InfoChip(
-                                icon: TablerIcons.trending_up,
-                                label: _capitalize(_workoutSet!.difficulty)),
+                              icon: TablerIcons.trending_up,
+                              label: _capitalize(_workoutSet!.difficulty),
+                            ),
                             _InfoChip(
-                                icon: TablerIcons.tag,
-                                label: _capitalize(_workoutSet!.category)),
+                              icon: TablerIcons.tag,
+                              label: _capitalize(_workoutSet!.category),
+                            ),
                           ],
                         ),
                       ],
@@ -537,12 +574,17 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: ColorTokens.accent.withOpacity(0.3), width: 1),
+                            color: ColorTokens.accent.withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
                         child: Text(
                           '${_exercises.length} exercises',
@@ -582,7 +624,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: ColorTokens.background,
-            border: Border(top: BorderSide(color: ColorTokens.border, width: 1)),
+            border: Border(
+              top: BorderSide(color: ColorTokens.border, width: 1),
+            ),
           ),
           child: Row(
             children: [
@@ -592,12 +636,17 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     side: BorderSide(color: ColorTokens.accent),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(TablerIcons.calendar_plus, color: ColorTokens.accent),
+                      Icon(
+                        TablerIcons.calendar_plus,
+                        color: ColorTokens.accent,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Schedule',
@@ -618,12 +667,17 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: ColorTokens.accent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(TablerIcons.player_play, color: ColorTokens.background),
+                      Icon(
+                        TablerIcons.player_play,
+                        color: ColorTokens.background,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Start Workout',
@@ -655,10 +709,7 @@ class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-  });
+  const _InfoChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -765,21 +816,35 @@ class _ExerciseCard extends StatelessWidget {
                   runSpacing: 4,
                   children: [
                     if (sets != null)
-                      _ExerciseDetail(icon: TablerIcons.repeat, label: '$sets sets'),
+                      _ExerciseDetail(
+                        icon: TablerIcons.repeat,
+                        label: '$sets sets',
+                      ),
                     if (reps != null)
-                      _ExerciseDetail(icon: TablerIcons.number, label: '$reps reps'),
+                      _ExerciseDetail(
+                        icon: TablerIcons.number,
+                        label: '$reps reps',
+                      ),
                     if (duration != null)
-                      _ExerciseDetail(icon: TablerIcons.clock, label: duration!),
+                      _ExerciseDetail(
+                        icon: TablerIcons.clock,
+                        label: duration!,
+                      ),
                     if (rest != null)
-                      _ExerciseDetail(icon: TablerIcons.clock_pause, label: 'Rest $rest'),
+                      _ExerciseDetail(
+                        icon: TablerIcons.clock_pause,
+                        label: 'Rest $rest',
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   children: [
-                    if (muscleGroup != null) _Tag(label: muscleGroup!, color: ColorTokens.accent),
-                    if (equipment != null) _Tag(label: equipment!, color: ColorTokens.textSecondary),
+                    if (muscleGroup != null)
+                      _Tag(label: muscleGroup!, color: ColorTokens.accent),
+                    if (equipment != null)
+                      _Tag(label: equipment!, color: ColorTokens.textSecondary),
                   ],
                 ),
               ],
@@ -795,10 +860,7 @@ class _ExerciseDetail extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _ExerciseDetail({
-    required this.icon,
-    required this.label,
-  });
+  const _ExerciseDetail({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -811,7 +873,9 @@ class _ExerciseDetail extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: ColorTokens.textSecondary,
+          ),
         ),
       ],
     );
@@ -822,10 +886,7 @@ class _Tag extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _Tag({
-    required this.label,
-    required this.color,
-  });
+  const _Tag({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -840,10 +901,7 @@ class _Tag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: color,
-          fontSize: 11,
-        ),
+        style: theme.textTheme.bodySmall?.copyWith(color: color, fontSize: 11),
       ),
     );
   }
@@ -893,11 +951,17 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               ),
               child: Icon(TablerIcons.calendar, color: ColorTokens.accent),
             ),
-            title: Text('Date',
-                style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
+            title: Text(
+              'Date',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: ColorTokens.textSecondary,
+              ),
+            ),
             subtitle: Text(
               '${_selectedDate.month}/${_selectedDate.day}/${_selectedDate.year}',
-              style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary),
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: ColorTokens.textPrimary,
+              ),
             ),
             onTap: () async {
               final date = await showDatePicker(
@@ -920,14 +984,23 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
               ),
               child: Icon(TablerIcons.clock, color: ColorTokens.accent),
             ),
-            title: Text('Time',
-                style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
+            title: Text(
+              'Time',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: ColorTokens.textSecondary,
+              ),
+            ),
             subtitle: Text(
               _selectedTime.format(context),
-              style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary),
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: ColorTokens.textPrimary,
+              ),
             ),
             onTap: () async {
-              final time = await showTimePicker(context: context, initialTime: _selectedTime);
+              final time = await showTimePicker(
+                context: context,
+                initialTime: _selectedTime,
+              );
               if (time != null) setState(() => _selectedTime = time);
             },
           ),
@@ -953,7 +1026,10 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: ColorTokens.textSecondary),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -965,11 +1041,16 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: ColorTokens.accent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: Text(
             'Schedule',
-            style: TextStyle(color: ColorTokens.background, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: ColorTokens.background,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
