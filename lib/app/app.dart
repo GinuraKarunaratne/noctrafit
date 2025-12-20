@@ -6,7 +6,6 @@ import 'router/app_router.dart';
 import 'providers/service_providers.dart';
 import 'providers/repository_providers.dart';
 import 'providers/accessibility_provider.dart';
-import 'providers/notification_providers.dart';
 import '../core/services/notification_service.dart';
 import '../data/local/db/app_database.dart';
 

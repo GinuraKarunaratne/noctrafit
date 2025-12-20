@@ -98,7 +98,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'create',
                     name: 'create-set',
-                    builder: (context, state) => const CreateSetScreen(),
+                    builder: (context, state) {
+                      final editUuid = state.uri.queryParameters['editUuid'];
+                      return CreateSetScreen(existingSetUuid: editUuid);
+                    },
                   ),
                 ],
               ),

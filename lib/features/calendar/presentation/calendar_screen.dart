@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -83,9 +84,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       workoutSetId: workoutSet.id,
       workoutSetName: workoutSet.name,
       workoutSetUuid: workoutSet.uuid,
-      totalExercises: workoutSet.exercises != null
-          ? (workoutSet.exercises as List).length
-          : 0,
+      totalExercises: (() {
+        try {
+          final parsed = jsonDecode(workoutSet.exercises) as List<dynamic>;
+          return parsed.length;
+        } catch (_) {
+          return 0;
+        }
+      })(),
       estimatedMinutes: workoutSet.estimatedMinutes,
     );
 

@@ -8,10 +8,14 @@ import 'package:tabler_icons/tabler_icons.dart';
 
 import '../../../app/providers/auth_provider.dart';
 import '../../../app/providers/repository_providers.dart';
+import '../../../app/providers/service_providers.dart';
 import '../../../app/theme/color_tokens.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/remote/firestore/user_remote_datasource.dart';
-import '../../../app/providers/service_providers.dart';
+
+// ✅ If you have these providers in your module, import and invalidate them.
+// If the import path is different in your project, adjust it.
+// import '../providers/plans_providers.dart';
 
 /// Set Details Screen - View workout set details
 class SetDetailsScreen extends ConsumerStatefulWidget {
@@ -58,16 +62,20 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
 
   Future<void> _loadWorkoutSet() async {
     // Try local DB first
-    var set = await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
+    var set =
+        await ref.read(setsRepositoryProvider).getSetByUuid(widget.workoutSetUuid);
 
     // If not found locally, try remote by uuid field
     if (set == null) {
       try {
         final setsRemote = ref.read(setsRemoteDataSourceProvider);
-        final remote = await setsRemote.fetchCommunitySetByUuid(uuid: widget.workoutSetUuid);
+        final remote =
+            await setsRemote.fetchCommunitySetByUuid(uuid: widget.workoutSetUuid);
         if (remote != null) {
           final exercisesRaw = remote['exercises'];
-          final exercisesStr = exercisesRaw is String ? exercisesRaw : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
+          final exercisesStr = exercisesRaw is String
+              ? exercisesRaw
+              : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
           set = WorkoutSet(
             id: 0,
             uuid: widget.workoutSetUuid,
@@ -75,22 +83,27 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             description: remote['description'],
             difficulty: (remote['difficulty'] ?? 'intermediate').toString(),
             category: (remote['category'] ?? 'hybrid').toString(),
-            estimatedMinutes: remote['estimated_minutes'] is int ? remote['estimated_minutes'] as int : int.tryParse(remote['estimated_minutes']?.toString() ?? '') ?? 30,
+            estimatedMinutes: remote['estimated_minutes'] is int
+                ? remote['estimated_minutes'] as int
+                : int.tryParse(remote['estimated_minutes']?.toString() ?? '') ?? 30,
             exercises: exercisesStr,
             source: 'community',
             authorId: remote['author_id'] ?? remote['author_uid'],
             authorName: remote['author_name'] ?? remote['author_name'],
             isFavorite: false,
-            createdAt: remote['created_at'] is Timestamp ? (remote['created_at'] as Timestamp).toDate() : DateTime.now(),
-            updatedAt: remote['created_at'] is Timestamp ? (remote['created_at'] as Timestamp).toDate() : DateTime.now(),
+            createdAt: remote['created_at'] is Timestamp
+                ? (remote['created_at'] as Timestamp).toDate()
+                : DateTime.now(),
+            updatedAt: remote['created_at'] is Timestamp
+                ? (remote['created_at'] as Timestamp).toDate()
+                : DateTime.now(),
             lastSyncedAt: DateTime.now(),
           );
+
           // Persist the fetched remote set into local DB for offline availability
           try {
             await ref.read(setsRepositoryProvider).upsertFromFirestore(remote);
-          } catch (_) {
-            // Non-fatal: if upsert fails, continue and still show remote data
-          }
+          } catch (_) {}
         }
       } catch (_) {}
     }
@@ -98,11 +111,16 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     // If still null, try fetching by Firestore document id (doc ID may be used as uuid)
     if (set == null) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('community_sets').doc(widget.workoutSetUuid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('community_sets')
+            .doc(widget.workoutSetUuid)
+            .get();
         if (doc.exists) {
           final data = doc.data()!;
           final exercisesRaw = data['exercises'];
-          final exercisesStr = exercisesRaw is String ? exercisesRaw : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
+          final exercisesStr = exercisesRaw is String
+              ? exercisesRaw
+              : (exercisesRaw != null ? jsonEncode(exercisesRaw) : '[]');
           set = WorkoutSet(
             id: 0,
             uuid: widget.workoutSetUuid,
@@ -110,16 +128,23 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             description: data['description'],
             difficulty: (data['difficulty'] ?? 'intermediate').toString(),
             category: (data['category'] ?? 'hybrid').toString(),
-            estimatedMinutes: data['estimated_minutes'] is int ? data['estimated_minutes'] as int : int.tryParse(data['estimated_minutes']?.toString() ?? '') ?? 30,
+            estimatedMinutes: data['estimated_minutes'] is int
+                ? data['estimated_minutes'] as int
+                : int.tryParse(data['estimated_minutes']?.toString() ?? '') ?? 30,
             exercises: exercisesStr,
             source: 'community',
             authorId: data['author_id'] ?? data['author_uid'],
             authorName: data['author_name'],
             isFavorite: false,
-            createdAt: data['created_at'] is Timestamp ? (data['created_at'] as Timestamp).toDate() : DateTime.now(),
-            updatedAt: data['created_at'] is Timestamp ? (data['created_at'] as Timestamp).toDate() : DateTime.now(),
+            createdAt: data['created_at'] is Timestamp
+                ? (data['created_at'] as Timestamp).toDate()
+                : DateTime.now(),
+            updatedAt: data['created_at'] is Timestamp
+                ? (data['created_at'] as Timestamp).toDate()
+                : DateTime.now(),
             lastSyncedAt: DateTime.now(),
           );
+
           // Persist the document into local DB so it becomes available offline
           try {
             await ref.read(setsRepositoryProvider).upsertFromFirestore(data);
@@ -129,14 +154,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     }
 
     if (set != null && mounted) {
-      // Parse exercises outside setState to avoid capturing `set` (which analyzer
-      // may consider nullable inside the closure).
       List<Map<String, dynamic>> parsedExercises = [];
       try {
         final exercisesStr = set.exercises;
         final exercisesJson = jsonDecode(exercisesStr) as List<dynamic>;
         parsedExercises = exercisesJson.cast<Map<String, dynamic>>();
-      } catch (e) {
+      } catch (_) {
         parsedExercises = [];
       }
 
@@ -156,7 +179,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
       _workoutSet = _workoutSet!.copyWith(isFavorite: newFavoriteStatus);
     });
 
-    await ref.read(setsRepositoryProvider).toggleFavorite(_workoutSet!.id, newFavoriteStatus);
+    await ref
+        .read(setsRepositoryProvider)
+        .toggleFavorite(_workoutSet!.id, newFavoriteStatus);
 
     final user = ref.read(currentUserProvider);
     if (user != null) {
@@ -167,7 +192,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
         } else {
           await userDataSource.removeFavorite(user.uid, widget.workoutSetUuid);
         }
-      } catch (e) {
+      } catch (_) {
         // Offline - will sync later
       }
     }
@@ -177,12 +202,12 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     if (_workoutSet == null) return;
 
     await ref.read(sessionRepositoryProvider).startSession(
-      workoutSetId: _workoutSet!.id,
-      workoutSetName: _workoutSet!.name,
-      workoutSetUuid: _workoutSet!.uuid,
-      totalExercises: _exercises.length,
-      estimatedMinutes: _workoutSet!.estimatedMinutes,
-    );
+          workoutSetId: _workoutSet!.id,
+          workoutSetName: _workoutSet!.name,
+          workoutSetUuid: _workoutSet!.uuid,
+          totalExercises: _exercises.length,
+          estimatedMinutes: _workoutSet!.estimatedMinutes,
+        );
 
     final session = await ref.read(sessionRepositoryProvider).getActiveSession();
     if (session != null && mounted) {
@@ -202,24 +227,109 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
       final DateTime date = result['date'] as DateTime;
       final TimeOfDay time = result['time'] as TimeOfDay;
       final String timeString = _timeOfDayTo24hString(time);
-      final String? note = (result['note'] as String?)?.trim().isEmpty ?? true
-          ? null
-          : (result['note'] as String?)?.trim();
+      final String? note =
+          (result['note'] as String?)?.trim().isEmpty ?? true ? null : (result['note'] as String?)?.trim();
 
-      // ✅ FIX: pass String, not TimeOfDay
       await ref.read(scheduleRepositoryProvider).scheduleWorkout(
-        workoutSetId: _workoutSet!.id,
-        scheduledDate: date,
-        timeOfDay: timeString, // ✅ was: result['time']
-        note: note,
-        workoutName: _workoutSet!.name,
-      );
+            workoutSetId: _workoutSet!.id,
+            scheduledDate: date,
+            timeOfDay: timeString,
+            note: note,
+            workoutName: _workoutSet!.name,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Workout scheduled for ${date.toString().split(' ')[0]} at $timeString'),
+            content: Text(
+                'Workout scheduled for ${date.toString().split(' ')[0]} at $timeString'),
             backgroundColor: ColorTokens.success,
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ NEW: actually delete from Firestore if it’s a community set you own
+  Future<void> _deleteWorkout() async {
+    if (_workoutSet == null) return;
+
+    final user = ref.read(currentUserProvider);
+    final isOwnedCommunity = _workoutSet!.source == 'community' &&
+        user != null &&
+        user.uid == _workoutSet!.authorId;
+
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: ColorTokens.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Delete workout?', style: TextStyle(color: ColorTokens.textPrimary)),
+        content: Text(
+          isOwnedCommunity
+              ? 'This will delete the workout from Community (Firestore) and also remove it locally.'
+              : 'This will remove it locally. (You can only delete community workouts you published.)',
+          style: TextStyle(color: ColorTokens.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: ColorTokens.error),
+            child: Text('Delete', style: TextStyle(color: ColorTokens.background)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // 1) If it's your community set, delete the Firestore doc too
+      if (isOwnedCommunity) {
+        // Your publish uses: doc(workoutSet.uuid), so delete by uuid
+        await FirebaseFirestore.instance
+            .collection('community_sets')
+            .doc(_workoutSet!.uuid)
+            .delete();
+      }
+
+      // 2) Always delete locally (for local user sets and for community cache)
+      await ref.read(setsRepositoryProvider).deleteSet(_workoutSet!.id);
+
+      // 3) Force UI refresh
+      ref.invalidate(setsRepositoryProvider);
+      // If you have list providers, invalidate them too:
+      // ref.invalidate(appSetsProvider);
+      // ref.invalidate(communitySetsProvider);
+      // ref.invalidate(allSetsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Workout deleted'), backgroundColor: ColorTokens.success),
+        );
+        Navigator.pop(context);
+      }
+    } on FirebaseException catch (e) {
+      // This usually means rules blocked delete, or you're offline.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete from Firebase: ${e.code}'),
+            backgroundColor: ColorTokens.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete workout'),
+            backgroundColor: ColorTokens.error,
           ),
         );
       }
@@ -233,14 +343,14 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
     if (_workoutSet == null) {
       return Scaffold(
         backgroundColor: ColorTokens.background,
-        appBar: AppBar(
-          title: const Text('Loading...'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        appBar: AppBar(title: const Text('Loading...')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
+
+    final user = ref.read(currentUserProvider);
+    final canDelete = _workoutSet!.source == 'user' ||
+        (_workoutSet!.source == 'community' && user?.uid == _workoutSet!.authorId);
 
     return Scaffold(
       backgroundColor: ColorTokens.background,
@@ -251,10 +361,15 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
             pinned: true,
             backgroundColor: ColorTokens.background,
             leading: IconButton(
-              icon:  Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
+              icon: Icon(TablerIcons.arrow_left, color: ColorTokens.textPrimary),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
+              if (canDelete)
+                IconButton(
+                  icon: Icon(TablerIcons.trash, color: ColorTokens.error),
+                  onPressed: _deleteWorkout, // ✅ uses new function
+                ),
               IconButton(
                 icon: Icon(
                   _workoutSet!.isFavorite ? TablerIcons.star_filled : TablerIcons.star,
@@ -293,18 +408,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                         Wrap(
                           spacing: 8,
                           children: [
-                            _InfoChip(
-                              icon: TablerIcons.clock,
-                              label: '${_workoutSet!.estimatedMinutes} min',
-                            ),
-                            _InfoChip(
-                              icon: TablerIcons.trending_up,
-                              label: _capitalize(_workoutSet!.difficulty),
-                            ),
-                            _InfoChip(
-                              icon: TablerIcons.tag,
-                              label: _capitalize(_workoutSet!.category),
-                            ),
+                            _InfoChip(icon: TablerIcons.clock, label: '${_workoutSet!.estimatedMinutes} min'),
+                            _InfoChip(icon: TablerIcons.trending_up, label: _capitalize(_workoutSet!.difficulty)),
+                            _InfoChip(icon: TablerIcons.tag, label: _capitalize(_workoutSet!.category)),
                           ],
                         ),
                       ],
@@ -355,10 +461,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                         decoration: BoxDecoration(
                           color: ColorTokens.accent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: ColorTokens.accent.withOpacity(0.3),
-                            width: 1,
-                          ),
+                          border: Border.all(color: ColorTokens.accent.withOpacity(0.3), width: 1),
                         ),
                         child: Text(
                           '${_exercises.length} exercises',
@@ -402,9 +505,7 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: ColorTokens.background,
-            border: Border(
-              top: BorderSide(color: ColorTokens.border, width: 1),
-            ),
+            border: Border(top: BorderSide(color: ColorTokens.border, width: 1)),
           ),
           child: Row(
             children: [
@@ -413,12 +514,10 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   onPressed: _addToCalendar,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side:  BorderSide(color: ColorTokens.accent),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    side: BorderSide(color: ColorTokens.accent),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child:  Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(TablerIcons.calendar_plus, color: ColorTokens.accent),
@@ -442,11 +541,9 @@ class _SetDetailsScreenState extends ConsumerState<SetDetailsScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: ColorTokens.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child:  Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(TablerIcons.player_play, color: ColorTokens.background),
@@ -591,35 +688,21 @@ class _ExerciseCard extends StatelessWidget {
                   runSpacing: 4,
                   children: [
                     if (sets != null)
-                      _ExerciseDetail(
-                        icon: TablerIcons.repeat,
-                        label: '$sets sets',
-                      ),
+                      _ExerciseDetail(icon: TablerIcons.repeat, label: '$sets sets'),
                     if (reps != null)
-                      _ExerciseDetail(
-                        icon: TablerIcons.number,
-                        label: '$reps reps',
-                      ),
+                      _ExerciseDetail(icon: TablerIcons.number, label: '$reps reps'),
                     if (duration != null)
-                      _ExerciseDetail(
-                        icon: TablerIcons.clock,
-                        label: duration!,
-                      ),
+                      _ExerciseDetail(icon: TablerIcons.clock, label: duration!),
                     if (rest != null)
-                      _ExerciseDetail(
-                        icon: TablerIcons.clock_pause,
-                        label: 'Rest $rest',
-                      ),
+                      _ExerciseDetail(icon: TablerIcons.clock_pause, label: 'Rest $rest'),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   children: [
-                    if (muscleGroup != null)
-                      _Tag(label: muscleGroup!, color: ColorTokens.accent),
-                    if (equipment != null)
-                      _Tag(label: equipment!, color: ColorTokens.textSecondary),
+                    if (muscleGroup != null) _Tag(label: muscleGroup!, color: ColorTokens.accent),
+                    if (equipment != null) _Tag(label: equipment!, color: ColorTokens.textSecondary),
                   ],
                 ),
               ],
@@ -651,9 +734,7 @@ class _ExerciseDetail extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: ColorTokens.textSecondary,
-          ),
+          style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary),
         ),
       ],
     );
@@ -714,9 +795,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
 
     return AlertDialog(
       backgroundColor: ColorTokens.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
         'Schedule Workout',
         style: theme.textTheme.titleLarge?.copyWith(
@@ -735,19 +814,12 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
                 color: ColorTokens.accent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child:  Icon(TablerIcons.calendar, color: ColorTokens.accent),
+              child: Icon(TablerIcons.calendar, color: ColorTokens.accent),
             ),
-            title: Text(
-              'Date',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: ColorTokens.textSecondary,
-              ),
-            ),
+            title: Text('Date', style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
             subtitle: Text(
               '${_selectedDate.month}/${_selectedDate.day}/${_selectedDate.year}',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: ColorTokens.textPrimary,
-              ),
+              style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary),
             ),
             onTap: () async {
               final date = await showDatePicker(
@@ -756,9 +828,7 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
                 firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
-              if (date != null) {
-                setState(() => _selectedDate = date);
-              }
+              if (date != null) setState(() => _selectedDate = date);
             },
           ),
           const SizedBox(height: 8),
@@ -770,33 +840,19 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
                 color: ColorTokens.accent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child:  Icon(TablerIcons.clock, color: ColorTokens.accent),
+              child: Icon(TablerIcons.clock, color: ColorTokens.accent),
             ),
-            title: Text(
-              'Time',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: ColorTokens.textSecondary,
-              ),
-            ),
+            title: Text('Time', style: theme.textTheme.bodySmall?.copyWith(color: ColorTokens.textSecondary)),
             subtitle: Text(
               _selectedTime.format(context),
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: ColorTokens.textPrimary,
-              ),
+              style: theme.textTheme.titleSmall?.copyWith(color: ColorTokens.textPrimary),
             ),
             onTap: () async {
-              final time = await showTimePicker(
-                context: context,
-                initialTime: _selectedTime,
-              );
-              if (time != null) {
-                setState(() => _selectedTime = time);
-              }
+              final time = await showTimePicker(context: context, initialTime: _selectedTime);
+              if (time != null) setState(() => _selectedTime = time);
             },
           ),
           const SizedBox(height: 12),
-
-          // ✅ Note field (so result['note'] exists)
           TextField(
             controller: _noteController,
             maxLines: 2,
@@ -818,31 +874,23 @@ class _AddToCalendarDialogState extends State<_AddToCalendarDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child:  Text(
-            'Cancel',
-            style: TextStyle(color: ColorTokens.textSecondary),
-          ),
+          child: Text('Cancel', style: TextStyle(color: ColorTokens.textSecondary)),
         ),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(context, {
               'date': _selectedDate,
-              'time': _selectedTime, // keep as TimeOfDay, convert later in _addToCalendar()
+              'time': _selectedTime,
               'note': _noteController.text,
             });
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: ColorTokens.accent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
-          child:  Text(
+          child: Text(
             'Schedule',
-            style: TextStyle(
-              color: ColorTokens.background,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: ColorTokens.background, fontWeight: FontWeight.bold),
           ),
         ),
       ],

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:tabler_icons/tabler_icons.dart';
 import '../../../app/providers/auth_provider.dart';
 import '../../../app/providers/repository_providers.dart';
 import '../../../app/theme/color_tokens.dart';
+import '../../../data/local/db/app_database.dart';
 
 /// UF2: Create Set Screen - Add custom workout sets
 ///
@@ -20,7 +22,9 @@ import '../../../app/theme/color_tokens.dart';
 /// - "Publish to Community" button (saves locally + uploads to Firestore)
 /// - Offline-first: saves locally, queues for sync if offline
 class CreateSetScreen extends ConsumerStatefulWidget {
-  const CreateSetScreen({super.key});
+  final String? existingSetUuid;
+
+  const CreateSetScreen({super.key, this.existingSetUuid});
 
   @override
   ConsumerState<CreateSetScreen> createState() => _CreateSetScreenState();
@@ -108,6 +112,22 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingSetUuid != null) {
+      // Load existing set for editing
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadExistingSet(widget.existingSetUuid!);
+      });
+    }
+  }
+
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
   Future<void> _addExercise() async {
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -127,6 +147,29 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
         });
       });
     }
+  }
+
+  Future<void> _loadExistingSet(String uuid) async {
+    try {
+      final set = await ref.read(setsRepositoryProvider).getSetByUuid(uuid);
+      if (set == null) return;
+
+      List<Map<String, dynamic>> parsed = [];
+      try {
+        final decoded = jsonDecode(set.exercises) as List<dynamic>;
+        parsed = decoded.cast<Map<String, dynamic>>();
+      } catch (_) {}
+
+      setState(() {
+        _nameController.text = set.name;
+        _descriptionController.text = set.description ?? '';
+        _difficulty = _capitalize(set.difficulty);
+        _category = _capitalize(set.category);
+        _estimatedMinutes = set.estimatedMinutes;
+        _selectedExercises.clear();
+        _selectedExercises.addAll(parsed);
+      });
+    } catch (_) {}
   }
 
   void _removeExercise(int index) {
@@ -161,7 +204,38 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
       return;
     }
 
-    // Save to database
+    // If editing an existing set, update instead of creating
+    if (widget.existingSetUuid != null) {
+      try {
+        final existing = await ref.read(setsRepositoryProvider).getSetByUuid(widget.existingSetUuid!);
+        if (existing != null) {
+          final updated = existing.copyWith(
+            name: _nameController.text.trim(),
+            description: Value(_descriptionController.text.trim()),
+            difficulty: _difficulty.toLowerCase(),
+            category: _category.toLowerCase(),
+            estimatedMinutes: _estimatedMinutes,
+            exercises: jsonEncode(_selectedExercises),
+            updatedAt: DateTime.now(),
+          );
+
+          await ref.read(setsRepositoryProvider).updateSet(updated);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Workout updated'),
+                backgroundColor: ColorTokens.success,
+              ),
+            );
+            context.pop();
+          }
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // Save to database (create new)
     await ref
         .read(setsRepositoryProvider)
         .createCustomSet(
@@ -254,20 +328,43 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
       return;
     }
 
-    // Save locally first
-    final workoutSet = await ref
-        .read(setsRepositoryProvider)
-        .createCustomSet(
-          name: _nameController.text.trim(),
-          description: _descriptionController.text.trim(),
-          difficulty: _difficulty.toLowerCase(),
-          category: _category.toLowerCase(),
-          estimatedMinutes: _estimatedMinutes,
-          exercisesJson: jsonEncode(_selectedExercises),
-          authorName: user.email?.split('@').first,
-        );
+    // Save locally first (create or update)
+    WorkoutSet? workoutSet;
+    if (widget.existingSetUuid != null) {
+      try {
+        final existing = await ref.read(setsRepositoryProvider).getSetByUuid(widget.existingSetUuid!);
+        if (existing != null) {
+          final updated = existing.copyWith(
+            name: _nameController.text.trim(),
+            description: Value(_descriptionController.text.trim()),
+            difficulty: _difficulty.toLowerCase(),
+            category: _category.toLowerCase(),
+            estimatedMinutes: _estimatedMinutes,
+            exercises: jsonEncode(_selectedExercises),
+            updatedAt: DateTime.now(),
+          );
 
-    // Upload to Firestore community_sets
+          await ref.read(setsRepositoryProvider).updateSet(updated);
+          workoutSet = updated;
+        }
+      } catch (_) {}
+    }
+
+    if (workoutSet == null) {
+      workoutSet = await ref
+          .read(setsRepositoryProvider)
+          .createCustomSet(
+            name: _nameController.text.trim(),
+            description: _descriptionController.text.trim(),
+            difficulty: _difficulty.toLowerCase(),
+            category: _category.toLowerCase(),
+            estimatedMinutes: _estimatedMinutes,
+            exercisesJson: jsonEncode(_selectedExercises),
+            authorName: user.email?.split('@').first,
+          );
+    }
+
+    // Upload to Firestore community_sets (try immediate upload, fallback to queue)
     try {
       await FirebaseFirestore.instance
           .collection('community_sets')
@@ -279,7 +376,7 @@ class _CreateSetScreenState extends ConsumerState<CreateSetScreen> {
             'category': workoutSet.category,
             'estimated_minutes': workoutSet.estimatedMinutes,
             'exercises': workoutSet.exercises,
-            'author_name': workoutSet.authorName,
+            'author_name': workoutSet.authorName ?? user.email?.split('@').first,
             'author_uid': user.uid,
             'created_at': FieldValue.serverTimestamp(),
             'views_count': 0,
